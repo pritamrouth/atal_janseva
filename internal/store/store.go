@@ -12,8 +12,9 @@ type Step int
 const (
 	StepStart       Step = iota // 0 – just arrived, show language picker
 	StepLangChosen              // 1 – language chosen, waiting for PIN
-	StepWardChosen              // 2 – ward chosen, waiting for nagarsevak
-	StepMainMenu                // 3 – fully onboarded, showing main menu
+	StepWardChosen              // 2 – PIN valid, waiting for ward selection
+	StepNagarsevak              // 3 – ward chosen, waiting for nagarsevak selection
+	StepMainMenu                // 4 – fully onboarded, showing main menu
 )
 
 // Session holds the state for a single WhatsApp user.
@@ -22,17 +23,17 @@ type Session struct {
 	Step        Step
 	Lang        string // "en" | "mr" | "hi"
 
-	// Location
+	// Location resolved from DB
 	Pincode  string
 	State    string
 	District string
-	Ward     string
+	Ward     string // ward code, e.g. "17C"
 
-	// Selected nagarsevak name
-	Nagarsevak string
+	// Nagarsevak DB UUID chosen by the user
+	NagarsevakID   string
+	NagarsevakName string
 
-	// Pending – used to remember which list-reply we are expecting
-	// (e.g. "ward_select" or "nagarsevak_select")
+	// Pending context key to route list-reply
 	Pending string
 }
 

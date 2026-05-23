@@ -8,15 +8,14 @@ import (
 
 	"github.com/ataljanseva/whatsapp-bot/config"
 	"github.com/ataljanseva/whatsapp-bot/internal/bot"
+	"github.com/ataljanseva/whatsapp-bot/internal/db"
 	"github.com/ataljanseva/whatsapp-bot/internal/store"
 	"github.com/ataljanseva/whatsapp-bot/internal/whatsapp"
 
-	// Optional: loads .env automatically when present
 	"github.com/joho/godotenv"
 )
 
 func main() {
-	// Load .env if present (ignored in production where real env vars are set)
 	if err := godotenv.Load(); err != nil && !os.IsNotExist(err) {
 		log.Printf("[main] godotenv: %v (continuing)", err)
 	}
@@ -26,10 +25,18 @@ func main() {
 		log.Fatalf("[main] config: %v", err)
 	}
 
+	// PostgreSQL
+	repo, err := db.New(cfg.DatabaseURL)
+	if err != nil {
+		log.Fatalf("[main] db: %v", err)
+	}
+	defer repo.Close()
+	log.Printf("[main] database connected")
+
 	// Wire dependencies
-	waClient  := whatsapp.New(cfg.WAPhoneNumberID, cfg.WAAccessToken)
-	sessions  := store.New()
-	botHandler := bot.New(waClient, sessions)
+	waClient   := whatsapp.New(cfg.WAPhoneNumberID, cfg.WAAccessToken)
+	sessions   := store.New()
+	botHandler := bot.New(waClient, sessions, repo)
 
 	webhook := &webhookHandler{
 		verifyToken: cfg.WAVerifyToken,
