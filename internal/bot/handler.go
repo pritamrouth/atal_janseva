@@ -343,42 +343,42 @@ func nagarsevakURL(slug, suffix string) string {
 }
 
 func (h *Handler) sendMainMenu(ctx context.Context, phone string, sess *store.Session) {
-    t := h.t(sess)
+	t := h.t(sess)
 
-    ns, err := h.repo.NagarsevakByID(ctx, sess.NagarsevakID)
-    if err != nil {
-        slog.Error("sendMainMenu: NagarsevakByID", "phone", phone, "err", err)
-        ns = &db.Nagarsevak{
-            FullName:     sess.NagarsevakName,
-            ProfilePhoto: "",
-        }
-    }
+	ns, err := h.repo.NagarsevakByID(ctx, sess.NagarsevakID)
+	if err != nil {
+		slog.Error("sendMainMenu: NagarsevakByID", "phone", phone, "err", err)
+		ns = &db.Nagarsevak{
+			FullName:     sess.NagarsevakName,
+			ProfilePhoto: "",
+		}
+	}
 
-    // 1. If photo exists, send it with nagarsevak details as caption
-    //    This appears at the top of the "card" the user sees.
-    if ns.ProfilePhoto != "" {
-        caption := fmt.Sprintf("🏅 *%s*\n🎖 %s  ·  🏙 Ward %s",
-            ns.FullName, ns.Party, ns.Ward)
-        if err := h.wa.SendImage(ctx, phone, ns.ProfilePhoto, caption); err != nil {
-            slog.Warn("sendMainMenu: profile photo send failed", "phone", phone, "err", err)
-        }
-    }
 
-    // 2. Welcome message body
-    footer := fmt.Sprintf("📋 Nagarsevak: %s", sess.NagarsevakName)
-    if err := h.wa.SendText(ctx, phone, t.Welcome); err != nil {
-        slog.Error("sendMainMenu: SendText", "phone", phone, "err", err)
-    }
+	if ns.ProfilePhoto != "" {
+		// Single message: photo + full welcome text as caption
+		caption := fmt.Sprintf("🏅 *%s*\n🎖 %s  ·  🏙 Ward %s\n\n%s",
+			ns.FullName, ns.Party, ns.Ward, t.Welcome)
+		if err := h.wa.SendImage(ctx, phone, ns.ProfilePhoto, caption); err != nil {
+			slog.Warn("sendMainMenu: profile photo send failed", "phone", phone, "err", err)
+			// fallback to plain text if image fails
+			_ = h.wa.SendText(ctx, phone, t.Welcome)
+		}
+	} else {
+		// No photo — send nagarsevak details + welcome as plain text
+		header := fmt.Sprintf("🏅 *%s*\n🎖 %s  ·  🏙 Ward %s\n\n", ns.FullName, ns.Party, ns.Ward)
+		_ = h.wa.SendText(ctx, phone, header+t.Welcome)
+	}
 
-    // 3. CTA URL action buttons
-    ctaButtons := []whatsapp.CTAButton{
-        {Title: t.LabelSOS,      URL: nagarsevakURL(sess.NagarsevakSlug, "sos")},
-        {Title: t.LabelRegister, URL: nagarsevakURL(sess.NagarsevakSlug, "grievance")},
-        {Title: t.LabelTrack,    URL: nagarsevakURL(sess.NagarsevakSlug, "track-issue")},
-    }
-    if err := h.wa.SendCTAButtons(ctx, phone, t.LabelSOS, "", footer, ctaButtons); err != nil {
-        slog.Error("sendMainMenu SendCTAButtons", "phone", phone, "err", err)
-    }
+	// CTA URL buttons
+	ctaButtons := []whatsapp.CTAButton{
+		{Title: t.LabelSOS,      URL: nagarsevakURL(sess.NagarsevakSlug, "sos")},
+		{Title: t.LabelRegister, URL: nagarsevakURL(sess.NagarsevakSlug, "grievance")},
+		{Title: t.LabelTrack,    URL: nagarsevakURL(sess.NagarsevakSlug, "track-issue")},
+	}
+	if err := h.wa.SendCTAButtons(ctx, phone, t.LabelSOS, "", footer, ctaButtons); err != nil {
+		slog.Error("sendMainMenu SendCTAButtons", "phone", phone, "err", err)
+	}
 }
 
 // handleMainMenuSelection handles cases where the user somehow sends an
