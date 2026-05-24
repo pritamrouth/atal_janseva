@@ -27,13 +27,16 @@ type Ward struct {
 	CodeHindi string
 }
 
+// Nagarsevak holds a single representative's details.
+// ProfilePhoto is a public URL stored in the profile_photo column.
 type Nagarsevak struct {
-	ID        string
-	FullName  string
-	NameHindi string
-	Party     string
-	Ward      string
-	Slug      string
+	ID           string
+	FullName     string
+	NameHindi    string
+	Party        string
+	Ward         string
+	Slug         string
+	ProfilePhoto string // TASK 2 – public URL for the representative's photo
 }
 
 // ─────────────────────────────────────────────
@@ -51,11 +54,10 @@ func New(dsn string, maxOpen, maxIdle int) (*Repo, error) {
 		return nil, fmt.Errorf("sql.Open: %w", err)
 	}
 
-	// ── Pool tuning ──────────────────────────────────────
 	db.SetMaxOpenConns(maxOpen)
 	db.SetMaxIdleConns(maxIdle)
-	db.SetConnMaxLifetime(5 * time.Minute)  // recycle connections
-	db.SetConnMaxIdleTime(2 * time.Minute)  // drop idle connections early
+	db.SetConnMaxLifetime(5 * time.Minute)
+	db.SetConnMaxIdleTime(2 * time.Minute)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -115,12 +117,17 @@ func (r *Repo) WardsByPincode(ctx context.Context, pincode string) ([]Ward, erro
 	return wards, rows.Err()
 }
 
+// NagarsevaksByWard returns all active representatives for a pincode+ward.
+// It reads the profile_photo column (TASK 2).
 func (r *Repo) NagarsevaksByWard(ctx context.Context, pincode, ward string) ([]Nagarsevak, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT id, full_name,
+		SELECT id,
+		       full_name,
 		       COALESCE(name_hindi,''),
 		       COALESCE(party,''),
-		       ward, slug
+		       ward,
+		       slug,
+		       COALESCE(profile_photo,'')
 		FROM   political_users
 		WHERE  pincode::text = $1
 		  AND  ward = $2
@@ -135,7 +142,11 @@ func (r *Repo) NagarsevaksByWard(ctx context.Context, pincode, ward string) ([]N
 	var list []Nagarsevak
 	for rows.Next() {
 		var n Nagarsevak
-		if err := rows.Scan(&n.ID, &n.FullName, &n.NameHindi, &n.Party, &n.Ward, &n.Slug); err != nil {
+		if err := rows.Scan(
+			&n.ID, &n.FullName, &n.NameHindi,
+			&n.Party, &n.Ward, &n.Slug,
+			&n.ProfilePhoto, // TASK 2
+		); err != nil {
 			return nil, err
 		}
 		list = append(list, n)
@@ -143,19 +154,28 @@ func (r *Repo) NagarsevaksByWard(ctx context.Context, pincode, ward string) ([]N
 	return list, rows.Err()
 }
 
+// NagarsevakByID looks up a single representative by primary key.
+// It reads the profile_photo column (TASK 2).
 func (r *Repo) NagarsevakByID(ctx context.Context, id string) (*Nagarsevak, error) {
 	row := r.db.QueryRowContext(ctx, `
-		SELECT id, full_name,
+		SELECT id,
+		       full_name,
 		       COALESCE(name_hindi,''),
 		       COALESCE(party,''),
-		       ward, slug
+		       ward,
+		       slug,
+		       COALESCE(profile_photo,'')
 		FROM   political_users
 		WHERE  id = $1
 		LIMIT  1
 	`, id)
 
 	var n Nagarsevak
-	if err := row.Scan(&n.ID, &n.FullName, &n.NameHindi, &n.Party, &n.Ward, &n.Slug); err != nil {
+	if err := row.Scan(
+		&n.ID, &n.FullName, &n.NameHindi,
+		&n.Party, &n.Ward, &n.Slug,
+		&n.ProfilePhoto, // TASK 2
+	); err != nil {
 		return nil, err
 	}
 	return &n, nil

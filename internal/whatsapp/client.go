@@ -28,11 +28,9 @@ type Client struct {
 // New returns a Client with a tuned HTTP transport.
 func New(phoneNumberID, accessToken string) *Client {
 	transport := &http.Transport{
-		// Keep connections alive across requests
 		MaxIdleConns:        200,
 		MaxIdleConnsPerHost: 100,
 		IdleConnTimeout:     90 * time.Second,
-		// Fast TCP dialling
 		DialContext: (&net.Dialer{
 			Timeout:   5 * time.Second,
 			KeepAlive: 30 * time.Second,
@@ -65,6 +63,18 @@ type textBody struct {
 type textObj struct {
 	PreviewURL bool   `json:"preview_url"`
 	Body       string `json:"body"`
+}
+
+// imageBody is used by SendImage (TASK 2).
+type imageBody struct {
+	MessagingProduct string   `json:"messaging_product"`
+	To               string   `json:"to"`
+	Type             string   `json:"type"`
+	Image            imageObj `json:"image"`
+}
+type imageObj struct {
+	Link    string `json:"link"`
+	Caption string `json:"caption,omitempty"`
 }
 
 type interactiveBody struct {
@@ -124,6 +134,20 @@ func (c *Client) SendText(ctx context.Context, to, text string) error {
 		To:               to,
 		Type:             "text",
 		Text:             textObj{Body: text},
+	})
+}
+
+// SendImage sends an image by public URL with an optional caption.
+// Used in TASK 2 to display nagarsevak profile photos before the selection list.
+func (c *Client) SendImage(ctx context.Context, to, imageURL, caption string) error {
+	return c.post(ctx, imageBody{
+		MessagingProduct: "whatsapp",
+		To:               to,
+		Type:             "image",
+		Image: imageObj{
+			Link:    imageURL,
+			Caption: caption,
+		},
 	})
 }
 
@@ -218,14 +242,12 @@ func (c *Client) post(ctx context.Context, payload any) error {
 		resp.Body.Close()
 
 		if resp.StatusCode < 500 {
-			// 2xx = success; 4xx = permanent error (bad payload/token) – don't retry
 			if resp.StatusCode >= 400 {
 				return fmt.Errorf("WA API %d: %s", resp.StatusCode, string(body))
 			}
 			return nil
 		}
 
-		// 5xx – retry
 		lastErr = fmt.Errorf("attempt %d: WA API %d: %s", attempt+1, resp.StatusCode, string(body))
 		slog.Warn("WA API 5xx, retrying", "attempt", attempt+1, "status", resp.StatusCode)
 	}

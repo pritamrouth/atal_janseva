@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ataljanseva/whatsapp-bot/internal/db"
+	"github.com/ataljanseva/whatsapp-bot/internal/inactivity"
 	"github.com/ataljanseva/whatsapp-bot/internal/store"
 	"github.com/ataljanseva/whatsapp-bot/internal/whatsapp"
 )
@@ -20,14 +21,15 @@ const jobTimeout = 12 * time.Second
 
 // Handler processes inbound WhatsApp messages.
 type Handler struct {
-	wa    *whatsapp.Client
-	store *store.Store
-	repo  *db.Repo
+	wa       *whatsapp.Client
+	store    *store.Store
+	repo     *db.Repo
+	inactive *inactivity.Monitor
 }
 
-// New returns a Handler.
-func New(wa *whatsapp.Client, s *store.Store, repo *db.Repo) *Handler {
-	return &Handler{wa: wa, store: s, repo: repo}
+// New returns a Handler wired with the inactivity monitor.
+func New(wa *whatsapp.Client, s *store.Store, repo *db.Repo, inactive *inactivity.Monitor) *Handler {
+	return &Handler{wa: wa, store: s, repo: repo, inactive: inactive}
 }
 
 // HandleRaw is the worker entry-point: one call per inbound message.
@@ -36,8 +38,10 @@ func (h *Handler) HandleRaw(msg whatsapp.Message) {
 	defer cancel()
 
 	log := slog.With("phone", msg.From, "type", msg.Type)
-
 	phone := msg.From
+
+	// ── Reset inactivity clock on every inbound message ───────────────────────
+	h.inactive.Touch(ctx, phone)
 
 	sess, err := h.store.Get(ctx, phone)
 	if err != nil {
@@ -45,11 +49,12 @@ func (h *Handler) HandleRaw(msg whatsapp.Message) {
 		return
 	}
 
-	// Global reset
+	// ── Global reset command ──────────────────────────────────────────────────
 	if msg.Type == "text" && strings.EqualFold(strings.TrimSpace(msg.Text.Body), "reset") {
 		if err := h.store.Reset(ctx, phone); err != nil {
 			log.Error("reset session", "err", err)
 		}
+		h.inactive.Cancel(ctx, phone)
 		_ = h.wa.SendText(ctx, phone, "🔄 Session reset. Type anything to start over.")
 		return
 	}
@@ -67,7 +72,7 @@ func (h *Handler) HandleRaw(msg whatsapp.Message) {
 			case "lang_hi":
 				sess.Lang = "hi"
 			default:
-				h.sendLanguagePicker(ctx, phone)
+				h.sendLanguagePicker(ctx, phone, phone)
 				return
 			}
 			sess.Step = store.StepLangChosen
@@ -77,7 +82,7 @@ func (h *Handler) HandleRaw(msg whatsapp.Message) {
 			}
 			_ = h.wa.SendText(ctx, phone, h.t(sess).PinPrompt)
 		} else {
-			h.sendLanguagePicker(ctx, phone)
+			h.sendLanguagePicker(ctx, phone, phone) // TASK 1: pass real phone
 		}
 
 	case store.StepLangChosen:
@@ -114,9 +119,14 @@ func (h *Handler) HandleRaw(msg whatsapp.Message) {
 // Step 0 – language picker
 // ─────────────────────────────────────────────
 
-func (h *Handler) sendLanguagePicker(ctx context.Context, phone string) {
-	err := h.wa.SendButtons(ctx, phone, I18n["en"].Greeting, [][2]string{
-		{"lang_en", "🇬🇧 English"},
+// sendLanguagePicker sends the greeting with the user's real phone number (TASK 1).
+func (h *Handler) sendLanguagePicker(ctx context.Context, phone, rawPhone string) {
+	// Use "en" greeting so the initial message is always in English.
+	// The phone number is injected dynamically via GreetingFor().
+	greeting := GreetingFor("en", rawPhone)
+
+	err := h.wa.SendButtons(ctx, phone, greeting, [][2]string{
+		{"lang_en", "🇮🇳 English"},
 		{"lang_mr", "🇮🇳 मराठी"},
 		{"lang_hi", "🇮🇳 हिंदी"},
 	})
@@ -184,8 +194,8 @@ func (h *Handler) promptWard(ctx context.Context, phone string, sess *store.Sess
 	}
 
 	bodyText := fmt.Sprintf(t.WardPrompt, sess.State, sess.District)
-	if err := h.wa.SendList(ctx, phone, bodyText, "Select Ward", []whatsapp.ListSection{
-		{Title: "Available Wards", Rows: rows},
+	if err := h.wa.SendList(ctx, phone, bodyText, "📍 Select Ward", []whatsapp.ListSection{
+		{Title: "🏙 Available Wards", Rows: rows},
 	}); err != nil {
 		slog.Error("promptWard SendList", "phone", phone, "err", err)
 	}
@@ -207,7 +217,7 @@ func (h *Handler) handleWardReply(ctx context.Context, phone string, sess *store
 }
 
 // ─────────────────────────────────────────────
-// Step 3 – nagarsevak list
+// Step 3 – nagarsevak list (TASK 2: profile photo)
 // ─────────────────────────────────────────────
 
 func (h *Handler) promptNagarsevak(ctx context.Context, phone string, sess *store.Session) {
@@ -226,17 +236,42 @@ func (h *Handler) promptNagarsevak(ctx context.Context, phone string, sess *stor
 	}
 
 	t := h.t(sess)
+
+	// TASK 2 – Send profile photo for each nagarsevak before the list.
+	// WhatsApp does not support images inside list rows, so we send each
+	// candidate's photo as an image message immediately before the selection
+	// list. This gives the user a visual reference while they choose.
+	for _, ns := range nagarsevaks {
+		if ns.ProfilePhoto != "" {
+			name := ns.FullName
+			if sess.Lang != "en" && ns.NameHindi != "" {
+				name = ns.NameHindi
+			}
+			caption := fmt.Sprintf("🏅 *%s*\n🎖 %s · 🏙 Ward %s", name, ns.Party, ns.Ward)
+			if sendErr := h.wa.SendImage(ctx, phone, ns.ProfilePhoto, caption); sendErr != nil {
+				// Non-fatal: log and continue — the list will still be sent
+				slog.Warn("promptNagarsevak: failed to send profile photo",
+					"phone", phone, "nagarsevak_id", ns.ID, "err", sendErr)
+			}
+		}
+	}
+
+	// Build the selection list
 	rows := make([][3]string, 0, len(nagarsevaks))
 	for _, ns := range nagarsevaks {
 		name := ns.FullName
 		if sess.Lang != "en" && ns.NameHindi != "" {
 			name = ns.NameHindi
 		}
-		rows = append(rows, [3]string{"ns_" + ns.ID, name, ns.Party + " · Ward " + ns.Ward})
+		rows = append(rows, [3]string{
+			"ns_" + ns.ID,
+			name,
+			ns.Party + " · Ward " + ns.Ward,
+		})
 	}
 
-	if err := h.wa.SendList(ctx, phone, t.NagarsevakPrompt, "Select Nagarsevak", []whatsapp.ListSection{
-		{Title: "political_users", Rows: rows},
+	if err := h.wa.SendList(ctx, phone, t.NagarsevakPrompt, "🏅 Select Nagarsevak", []whatsapp.ListSection{
+		{Title: "👥 Candidates", Rows: rows},
 	}); err != nil {
 		slog.Error("promptNagarsevak SendList", "phone", phone, "err", err)
 	}

@@ -1,15 +1,19 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/ataljanseva/whatsapp-bot/config"
 	"github.com/ataljanseva/whatsapp-bot/internal/bot"
 	"github.com/ataljanseva/whatsapp-bot/internal/db"
+	"github.com/ataljanseva/whatsapp-bot/internal/inactivity"
 	"github.com/ataljanseva/whatsapp-bot/internal/store"
 	"github.com/ataljanseva/whatsapp-bot/internal/whatsapp"
 	"github.com/ataljanseva/whatsapp-bot/internal/worker"
@@ -40,12 +44,16 @@ func main() {
 		os.Exit(1)
 	}
 
-	// ── Redis (local) ─────────────────────────────────────────────────────────
+	// ── Context for clean shutdown ────────────────────────────────────────────
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	// ── Redis ─────────────────────────────────────────────────────────────────
 	rdb := redis.NewClient(&redis.Options{
 		Addr:         cfg.RedisAddr,
 		Password:     cfg.RedisPassword,
 		DB:           cfg.RedisDB,
-		PoolSize:     cfg.WorkerCount + 10, // one conn per worker + headroom
+		PoolSize:     cfg.WorkerCount + 10,
 		MinIdleConns: 5,
 		DialTimeout:  3 * time.Second,
 		ReadTimeout:  2 * time.Second,
@@ -68,9 +76,27 @@ func main() {
 	defer repo.Close()
 	slog.Info("database connected")
 
+	// ── WhatsApp client ───────────────────────────────────────────────────────
+	waClient := whatsapp.New(cfg.WAPhoneNumberID, cfg.WAAccessToken)
+
+	// ── TASK 3 – Inactivity monitor ───────────────────────────────────────────
+	// When a user is idle for 90 seconds, we:
+	//   1. Send them a localised "session timed out" message.
+	//   2. Delete their Redis session so the next "Hi" starts fresh.
+	//      (Session deletion is handled inside the monitor itself before calling
+	//       this callback, so the callback only needs to send the message.)
+	inactiveMonitor := inactivity.New(rdb, func(cbCtx context.Context, phone, lang string) {
+		// Session has already been cleared by the monitor before this fires.
+		// lang is the user's last-known language — use it for a localised message.
+		msg := inactivity.InactivityMessage(lang)
+		if err := waClient.SendText(cbCtx, phone, msg); err != nil {
+			slog.Warn("inactivity: failed to send timeout message", "phone", phone, "err", err)
+		}
+	})
+	inactiveMonitor.Start(ctx)
+
 	// ── Bot + Worker pool ─────────────────────────────────────────────────────
-	waClient   := whatsapp.New(cfg.WAPhoneNumberID, cfg.WAAccessToken)
-	botHandler := bot.New(waClient, sessionStore, repo)
+	botHandler := bot.New(waClient, sessionStore, repo, inactiveMonitor)
 
 	pool := worker.New(cfg.WorkerCount, cfg.QueueDepth, botHandler.HandleRaw)
 	pool.Start()
@@ -99,9 +125,23 @@ func main() {
 		"port", cfg.Port,
 		"workers", cfg.WorkerCount,
 		"queue_depth", cfg.QueueDepth,
+		"inactivity_timeout", inactivity.InactivityTimeout,
 	)
-	if err := srv.ListenAndServe(); err != nil {
-		slog.Error("server", "err", err)
-		os.Exit(1)
-	}
+
+	// Run server in a goroutine so we can listen for shutdown signals
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			slog.Error("server", "err", err)
+			os.Exit(1)
+		}
+	}()
+
+	// Block until signal
+	<-ctx.Done()
+	slog.Info("shutdown signal received, draining…")
+
+	shutCtx, shutCancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer shutCancel()
+	_ = srv.Shutdown(shutCtx)
+	slog.Info("server stopped cleanly")
 }
