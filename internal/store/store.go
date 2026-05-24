@@ -34,14 +34,17 @@ const (
 type Session struct {
 	PhoneNumber    string `json:"phone"`
 	Step           Step   `json:"step"`
-	Lang           string `json:"lang"`             // "en" | "mr" | "hi"
+	Lang           string `json:"lang"`
 	Pincode        string `json:"pincode"`
 	State          string `json:"state"`
 	District       string `json:"district"`
+	StateHindi     string `json:"state_hindi"`     // ← add
+	DistrictHindi  string `json:"district_hindi"`  // ← add
 	Ward           string `json:"ward"`
+	WardHindi      string `json:"ward_hindi"`      // ← add
 	NagarsevakID   string `json:"nagarsevak_id"`
 	NagarsevakName string `json:"nagarsevak_name"`
-	NagarsevakSlug string `json:"nagarsevak_slug"` // used for dynamic redirect URLs
+	NagarsevakSlug string `json:"nagarsevak_slug"`
 	Pending        string `json:"pending"`
 }
 

@@ -177,6 +177,10 @@ func (h *Handler) handlePin(ctx context.Context, phone string, sess *store.Sessi
 
 	sess.State = loc.State
 	sess.District = loc.District
+
+	sess.StateHindi    = loc.StateHindi
+	sess.DistrictHindi = loc.DistrictHindi
+
 	sess.Step = store.StepWardChosen
 	if err := h.store.Save(ctx, sess); err != nil {
 		slog.Error("save session", "phone", phone, "err", err)
@@ -197,7 +201,6 @@ func (h *Handler) promptWard(ctx context.Context, phone string, sess *store.Sess
 	} else {
 		wards, err = h.repo.WardsByPincode(ctx, sess.Pincode)
 	}
-	
 	if err != nil {
 		slog.Error("WardsByPincode", "pin", sess.Pincode, "err", err)
 		_ = h.wa.SendText(ctx, phone, "⚠️ Could not load ward data. Please try again.")
@@ -211,16 +214,27 @@ func (h *Handler) promptWard(ctx context.Context, phone string, sess *store.Sess
 	}
 
 	t := h.t(sess)
+
+	// Pick localised state/district label
+	stateName    := sess.State
+	districtName := sess.District
+	if (sess.Lang == "mr" || sess.Lang == "hi") && sess.StateHindi != "" {
+		stateName = sess.StateHindi
+	}
+	if (sess.Lang == "mr" || sess.Lang == "hi") && sess.DistrictHindi != "" {
+		districtName = sess.DistrictHindi
+	}
+
 	rows := make([][3]string, 0, len(wards))
 	for _, w := range wards {
 		label := w.Code
-		if sess.Lang != "en" && w.CodeHindi != "" {
-			label = w.Code + " (" + w.CodeHindi + ")"
+		if (sess.Lang == "mr" || sess.Lang == "hi") && w.CodeHindi != "" {
+			label = w.CodeHindi  // ← show ward_hindi label in list
 		}
 		rows = append(rows, [3]string{"ward_" + w.Code, label, ""})
 	}
 
-	bodyText := fmt.Sprintf(t.WardPrompt, sess.State, sess.District)
+	bodyText := fmt.Sprintf(t.WardPrompt, stateName, districtName)
 	if err := h.wa.SendList(ctx, phone, bodyText, "📍 Select Ward", []whatsapp.ListSection{
 		{Title: "🏙 Available Wards", Rows: rows},
 	}); err != nil {
