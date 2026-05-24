@@ -51,7 +51,7 @@ func New(phoneNumberID, accessToken string) *Client {
 }
 
 // ─────────────────────────────────────────────
-// Payload types
+// Payload types – text
 // ─────────────────────────────────────────────
 
 type textBody struct {
@@ -65,7 +65,10 @@ type textObj struct {
 	Body       string `json:"body"`
 }
 
-// imageBody is used by SendImage (TASK 2).
+// ─────────────────────────────────────────────
+// Payload types – image
+// ─────────────────────────────────────────────
+
 type imageBody struct {
 	MessagingProduct string   `json:"messaging_product"`
 	To               string   `json:"to"`
@@ -77,10 +80,14 @@ type imageObj struct {
 	Caption string `json:"caption,omitempty"`
 }
 
+// ─────────────────────────────────────────────
+// Payload types – interactive (buttons / list)
+// ─────────────────────────────────────────────
+
 type interactiveBody struct {
-	MessagingProduct string        `json:"messaging_product"`
-	To               string        `json:"to"`
-	Type             string        `json:"type"`
+	MessagingProduct string         `json:"messaging_product"`
+	To               string         `json:"to"`
+	Type             string         `json:"type"`
 	Interactive      interactiveObj `json:"interactive"`
 }
 type interactiveObj struct {
@@ -91,8 +98,9 @@ type interactiveObj struct {
 	Action interactAction  `json:"action"`
 }
 type interactHeader struct {
-	Type string `json:"type"`
-	Text string `json:"text"`
+	Type  string    `json:"type"`
+	Text  string    `json:"text,omitempty"`
+	Image *imageObj `json:"image,omitempty"`
 }
 type interactText struct{ Text string `json:"text"` }
 type interactAction struct {
@@ -118,6 +126,44 @@ type listRow struct {
 	Description string `json:"description,omitempty"`
 }
 
+// ─────────────────────────────────────────────
+// Payload types – CTA URL buttons
+// Meta docs: interactive type = "cta_url"
+// Each button opens a URL in the device browser.
+// ─────────────────────────────────────────────
+
+// CTAButton represents one URL-redirect button.
+type CTAButton struct {
+	Title string // button label (max 20 chars)
+	URL   string // destination URL
+}
+
+// ctaActionButton is the action.buttons entry for URL redirect buttons.
+type ctaActionButton struct {
+	Type  string `json:"type"`
+	URL   string `json:"url"`
+	Title string `json:"title"`
+}
+
+// ctaBody is the full payload for a CTA interactive message.
+// Meta uses a different structure than reply-buttons for URL buttons.
+type ctaBody struct {
+	MessagingProduct string    `json:"messaging_product"`
+	To               string    `json:"to"`
+	Type             string    `json:"type"`
+	Interactive      ctaInter  `json:"interactive"`
+}
+type ctaInter struct {
+	Type   string          `json:"type"` // "cta_url"
+	Header *interactHeader `json:"header,omitempty"`
+	Body   interactText    `json:"body"`
+	Footer *interactText   `json:"footer,omitempty"`
+	Action ctaInterAction  `json:"action"`
+}
+type ctaInterAction struct {
+	Buttons []ctaActionButton `json:"buttons"`
+}
+
 // ListSection is the exported type used when calling SendList.
 type ListSection struct {
 	Title string
@@ -128,6 +174,7 @@ type ListSection struct {
 // Public send methods
 // ─────────────────────────────────────────────
 
+// SendText sends a plain text message.
 func (c *Client) SendText(ctx context.Context, to, text string) error {
 	return c.post(ctx, textBody{
 		MessagingProduct: "whatsapp",
@@ -138,7 +185,6 @@ func (c *Client) SendText(ctx context.Context, to, text string) error {
 }
 
 // SendImage sends an image by public URL with an optional caption.
-// Used in TASK 2 to display nagarsevak profile photos before the selection list.
 func (c *Client) SendImage(ctx context.Context, to, imageURL, caption string) error {
 	return c.post(ctx, imageBody{
 		MessagingProduct: "whatsapp",
@@ -151,7 +197,13 @@ func (c *Client) SendImage(ctx context.Context, to, imageURL, caption string) er
 	})
 }
 
+// SendButtons sends up to 3 quick-reply buttons (no URL redirect).
 func (c *Client) SendButtons(ctx context.Context, to, bodyText string, buttons [][2]string) error {
+	return c.SendButtonsWithImageHeader(ctx, to, bodyText, "", buttons)
+}
+
+// SendButtonsWithImageHeader sends buttons with an optional image header.
+func (c *Client) SendButtonsWithImageHeader(ctx context.Context, to, bodyText, imageURL string, buttons [][2]string) error {
 	btns := make([]interactButton, 0, len(buttons))
 	for _, b := range buttons {
 		btns = append(btns, interactButton{
@@ -159,7 +211,7 @@ func (c *Client) SendButtons(ctx context.Context, to, bodyText string, buttons [
 			Reply: buttonReply{ID: b[0], Title: truncate(b[1], 20)},
 		})
 	}
-	return c.post(ctx, interactiveBody{
+	msg := interactiveBody{
 		MessagingProduct: "whatsapp",
 		To:               to,
 		Type:             "interactive",
@@ -168,9 +220,48 @@ func (c *Client) SendButtons(ctx context.Context, to, bodyText string, buttons [
 			Body:   interactText{Text: bodyText},
 			Action: interactAction{Buttons: btns},
 		},
-	})
+	}
+	if imageURL != "" {
+		msg.Interactive.Header = &interactHeader{Type: "image", Image: &imageObj{Link: imageURL}}
+	}
+	return c.post(ctx, msg)
 }
 
+// SendCTAButtons sends up to 3 URL-redirect buttons using the cta_url
+// interactive type. Each button opens its URL in the user's browser.
+// buttons is a slice of CTAButton{Title, URL}.
+// header is optional (pass "" to omit).
+// footer is optional (pass "" to omit).
+func (c *Client) SendCTAButtons(ctx context.Context, to, bodyText, header, footer string, buttons []CTAButton) error {
+	ctaBtns := make([]ctaActionButton, 0, len(buttons))
+	for _, b := range buttons {
+		ctaBtns = append(ctaBtns, ctaActionButton{
+			Type:  "url",
+			URL:   b.URL,
+			Title: truncate(b.Title, 20),
+		})
+	}
+
+	msg := ctaBody{
+		MessagingProduct: "whatsapp",
+		To:               to,
+		Type:             "interactive",
+		Interactive: ctaInter{
+			Type:   "button",
+			Body:   interactText{Text: bodyText},
+			Action: ctaInterAction{Buttons: ctaBtns},
+		},
+	}
+	if header != "" {
+		msg.Interactive.Header = &interactHeader{Type: "text", Text: header}
+	}
+	if footer != "" {
+		msg.Interactive.Footer = &interactText{Text: footer}
+	}
+	return c.post(ctx, msg)
+}
+
+// SendList sends a list-picker interactive message.
 func (c *Client) SendList(ctx context.Context, to, bodyText, buttonLabel string, sections []ListSection) error {
 	waSections := make([]listSection, 0, len(sections))
 	for _, s := range sections {

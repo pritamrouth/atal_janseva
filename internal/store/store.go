@@ -15,8 +15,8 @@ import (
 )
 
 const (
-	sessionTTL    = 24 * time.Hour
-	keyPrefix     = "wa:session:"
+	sessionTTL = 24 * time.Hour
+	keyPrefix  = "wa:session:"
 )
 
 // Step represents the current step in the onboarding flow.
@@ -34,13 +34,14 @@ const (
 type Session struct {
 	PhoneNumber    string `json:"phone"`
 	Step           Step   `json:"step"`
-	Lang           string `json:"lang"`            // "en" | "mr" | "hi"
+	Lang           string `json:"lang"`             // "en" | "mr" | "hi"
 	Pincode        string `json:"pincode"`
 	State          string `json:"state"`
 	District       string `json:"district"`
 	Ward           string `json:"ward"`
 	NagarsevakID   string `json:"nagarsevak_id"`
 	NagarsevakName string `json:"nagarsevak_name"`
+	NagarsevakSlug string `json:"nagarsevak_slug"` // used for dynamic redirect URLs
 	Pending        string `json:"pending"`
 }
 
@@ -71,7 +72,6 @@ func (s *Store) Get(ctx context.Context, phone string) (*Session, error) {
 	}
 	var sess Session
 	if err := json.Unmarshal([]byte(val), &sess); err != nil {
-		// Corrupted session – start fresh and log
 		slog.Warn("corrupted session, resetting", "phone", phone, "err", err)
 		return &Session{PhoneNumber: phone, Step: StepStart}, nil
 	}

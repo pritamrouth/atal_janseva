@@ -19,6 +19,13 @@ import (
 // jobTimeout is the max time a single message may take end-to-end.
 const jobTimeout = 12 * time.Second
 
+// ataljansevaDomain is the base URL used to build all redirect links.
+const ataljansevaDomain = "https://ataljanseva.in"
+
+// ataljansevaLogoURL is the publicly hosted Ataljanseva logo.
+// Served from your own CDN / storage — replace if the URL changes.
+const ataljansevaLogoURL = "https://ataljanseva.in/logo-1.png"
+
 // Handler processes inbound WhatsApp messages.
 type Handler struct {
 	wa       *whatsapp.Client
@@ -40,7 +47,7 @@ func (h *Handler) HandleRaw(msg whatsapp.Message) {
 	log := slog.With("phone", msg.From, "type", msg.Type)
 	phone := msg.From
 
-	// ── Reset inactivity clock on every inbound message ───────────────────────
+	// Reset inactivity clock on every inbound message
 	h.inactive.Touch(ctx, phone)
 
 	sess, err := h.store.Get(ctx, phone)
@@ -49,7 +56,7 @@ func (h *Handler) HandleRaw(msg whatsapp.Message) {
 		return
 	}
 
-	// ── Global reset command ──────────────────────────────────────────────────
+	// Global reset command
 	if msg.Type == "text" && strings.EqualFold(strings.TrimSpace(msg.Text.Body), "reset") {
 		if err := h.store.Reset(ctx, phone); err != nil {
 			log.Error("reset session", "err", err)
@@ -82,7 +89,7 @@ func (h *Handler) HandleRaw(msg whatsapp.Message) {
 			}
 			_ = h.wa.SendText(ctx, phone, h.t(sess).PinPrompt)
 		} else {
-			h.sendLanguagePicker(ctx, phone, phone) // TASK 1: pass real phone
+			h.sendLanguagePicker(ctx, phone, phone)
 		}
 
 	case store.StepLangChosen:
@@ -119,18 +126,15 @@ func (h *Handler) HandleRaw(msg whatsapp.Message) {
 // Step 0 – language picker
 // ─────────────────────────────────────────────
 
-// sendLanguagePicker sends the greeting with the user's real phone number (TASK 1).
+// sendLanguagePicker sends the Ataljanseva logo (TASK 1) followed immediately
+// by the language-picker button message with the user's real phone number.
 func (h *Handler) sendLanguagePicker(ctx context.Context, phone, rawPhone string) {
-	// Use "en" greeting so the initial message is always in English.
-	// The phone number is injected dynamically via GreetingFor().
 	greeting := GreetingFor("en", rawPhone)
-
-	err := h.wa.SendButtons(ctx, phone, greeting, [][2]string{
+	if err := h.wa.SendButtonsWithImageHeader(ctx, phone, greeting, ataljansevaLogoURL, [][2]string{
 		{"lang_en", "🇮🇳 English"},
 		{"lang_mr", "🇮🇳 मराठी"},
 		{"lang_hi", "🇮🇳 हिंदी"},
-	})
-	if err != nil {
+	}); err != nil {
 		slog.Error("sendLanguagePicker", "phone", phone, "err", err)
 	}
 }
@@ -217,7 +221,7 @@ func (h *Handler) handleWardReply(ctx context.Context, phone string, sess *store
 }
 
 // ─────────────────────────────────────────────
-// Step 3 – nagarsevak list (TASK 2: profile photo)
+// Step 3 – nagarsevak list + profile photos
 // ─────────────────────────────────────────────
 
 func (h *Handler) promptNagarsevak(ctx context.Context, phone string, sess *store.Session) {
@@ -237,19 +241,17 @@ func (h *Handler) promptNagarsevak(ctx context.Context, phone string, sess *stor
 
 	t := h.t(sess)
 
-	// TASK 2 – Send profile photo for each nagarsevak before the list.
-	// WhatsApp does not support images inside list rows, so we send each
-	// candidate's photo as an image message immediately before the selection
-	// list. This gives the user a visual reference while they choose.
+	// Send profile photo for each nagarsevak before the list.
+	// WhatsApp list rows don't support images — we send them as separate
+	// image messages so the user can see each candidate visually.
 	for _, ns := range nagarsevaks {
 		if ns.ProfilePhoto != "" {
 			name := ns.FullName
 			if sess.Lang != "en" && ns.NameHindi != "" {
 				name = ns.NameHindi
 			}
-			caption := fmt.Sprintf("🏅 *%s*\n🎖 %s · 🏙 Ward %s", name, ns.Party, ns.Ward)
+			caption := fmt.Sprintf("🏅 *%s*\n🎖 %s  ·  🏙 Ward %s", name, ns.Party, ns.Ward)
 			if sendErr := h.wa.SendImage(ctx, phone, ns.ProfilePhoto, caption); sendErr != nil {
-				// Non-fatal: log and continue — the list will still be sent
 				slog.Warn("promptNagarsevak: failed to send profile photo",
 					"phone", phone, "nagarsevak_id", ns.ID, "err", sendErr)
 			}
@@ -291,9 +293,10 @@ func (h *Handler) handleNagarsevakReply(ctx context.Context, phone string, sess 
 		h.promptNagarsevak(ctx, phone, sess)
 		return
 	}
-	sess.NagarsevakID = ns.ID
+	sess.NagarsevakID   = ns.ID
 	sess.NagarsevakName = ns.FullName
-	sess.Step = store.StepMainMenu
+	sess.NagarsevakSlug = ns.Slug // TASK 2 – persist slug for URL generation
+	sess.Step           = store.StepMainMenu
 	if err := h.store.Save(ctx, sess); err != nil {
 		slog.Error("save session", "phone", phone, "err", err)
 		return
@@ -302,45 +305,42 @@ func (h *Handler) handleNagarsevakReply(ctx context.Context, phone string, sess 
 }
 
 // ─────────────────────────────────────────────
-// Step 4 – main menu
+// Step 4 – main menu  (TASK 2: CTA URL buttons)
 // ─────────────────────────────────────────────
+
+// nagarsevakURL builds a full redirect URL from the slug and path suffix.
+// e.g. slug="vinodmishra", suffix="sos" → "https://ataljanseva.in/vinodmishra/sos"
+func nagarsevakURL(slug, suffix string) string {
+	return fmt.Sprintf("%s/%s/%s", ataljansevaDomain, slug, suffix)
+}
 
 func (h *Handler) sendMainMenu(ctx context.Context, phone string, sess *store.Session) {
 	t := h.t(sess)
-	if err := h.wa.SendButtons(ctx, phone, t.Welcome, [][2]string{
-		{"action_sos", t.LabelSOS},
-		{"action_register", t.LabelRegister},
-		{"action_track", t.LabelTrack},
-	}); err != nil {
-		slog.Error("sendMainMenu", "phone", phone, "err", err)
+
+	// TASK 2 – each button is a URL redirect built from the nagarsevak's slug.
+	ctaButtons := []whatsapp.CTAButton{
+		{Title: t.LabelSOS,      URL: nagarsevakURL(sess.NagarsevakSlug, "sos")},
+		{Title: t.LabelRegister, URL: nagarsevakURL(sess.NagarsevakSlug, "grievance")},
+		{Title: t.LabelTrack,    URL: nagarsevakURL(sess.NagarsevakSlug, "track-issue")},
+	}
+
+	header := "🏛 Ataljanseva Citizen Service"
+	footer := fmt.Sprintf("📋 Nagarsevak: %s", sess.NagarsevakName)
+
+	if err := h.wa.SendCTAButtons(ctx, phone, t.Welcome, header, footer, ctaButtons); err != nil {
+		slog.Error("sendMainMenu SendCTAButtons", "phone", phone, "err", err)
 	}
 }
 
+// handleMainMenuSelection handles cases where the user somehow sends an
+// interactive reply at StepMainMenu (shouldn't happen with CTA buttons, but
+// guard against it gracefully).
 func (h *Handler) handleMainMenuSelection(ctx context.Context, phone string, sess *store.Session, ir *whatsapp.InteractiveReply) {
-	id := buttonID(ir)
-	t := h.t(sess)
-
-	var label, handler string
-	switch id {
-	case "action_sos":
-		label, handler = t.LabelSOS, "SOS"
-	case "action_register":
-		label, handler = t.LabelRegister, "Register"
-	case "action_track":
-		label, handler = t.LabelTrack, "Track"
-	default:
-		h.sendMainMenu(ctx, phone, sess)
-		return
-	}
-
-	// ── TODO: replace with real sub-flow handlers ─────────────────────────────
-	msg := fmt.Sprintf(
-		"✅ You selected *%s*.\n\n_Nagarsevak: %s | Ward: %s_\n\n_Plug in your %s sub-flow in bot/handler.go._\n\nType anything to return to the main menu.",
-		label, sess.NagarsevakName, sess.Ward, handler,
-	)
-	_ = h.wa.SendText(ctx, phone, msg)
-	sess.Step = store.StepMainMenu
-	_ = h.store.Save(ctx, sess)
+	// CTA URL buttons don't send a reply back to the server — the user is
+	// redirected to the URL in their browser. If we somehow receive an
+	// interactive event here (e.g. from an older cached message), just
+	// re-display the main menu.
+	h.sendMainMenu(ctx, phone, sess)
 }
 
 // ─────────────────────────────────────────────
