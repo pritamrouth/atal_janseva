@@ -138,30 +138,27 @@ type CTAButton struct {
 	URL   string // destination URL
 }
 
-// ctaActionButton is the action.buttons entry for URL redirect buttons.
-type ctaActionButton struct {
-	Type  string `json:"type"`
-	URL   string `json:"url"`
-	Title string `json:"title"`
-}
-
-// ctaBody is the full payload for a CTA interactive message.
-// Meta uses a different structure than reply-buttons for URL buttons.
 type ctaBody struct {
-	MessagingProduct string    `json:"messaging_product"`
-	To               string    `json:"to"`
-	Type             string    `json:"type"`
-	Interactive      ctaInter  `json:"interactive"`
+    MessagingProduct string   `json:"messaging_product"`
+    To               string   `json:"to"`
+    Type             string   `json:"type"`
+    Interactive      ctaInter `json:"interactive"`
 }
 type ctaInter struct {
-	Type   string          `json:"type"` // "cta_url"
-	Header *interactHeader `json:"header,omitempty"`
-	Body   interactText    `json:"body"`
-	Footer *interactText   `json:"footer,omitempty"`
-	Action ctaInterAction  `json:"action"`
+    Type   string          `json:"type"`   // "cta_url"
+    Header *interactHeader `json:"header,omitempty"`
+    Body   interactText    `json:"body"`
+    Footer *interactText   `json:"footer,omitempty"`
+    Action ctaInterAction  `json:"action"`
 }
 type ctaInterAction struct {
-	Buttons []ctaActionButton `json:"buttons"`
+    Name       string         `json:"name"`       // "cta_url"
+    Parameters ctaButtonParams `json:"parameters"`
+}
+
+type ctaButtonParams struct {
+    DisplayText string `json:"display_text"`
+    URL         string `json:"url"`
 }
 
 // ListSection is the exported type used when calling SendList.
@@ -233,32 +230,45 @@ func (c *Client) SendButtonsWithImageHeader(ctx context.Context, to, bodyText, i
 // header is optional (pass "" to omit).
 // footer is optional (pass "" to omit).
 func (c *Client) SendCTAButtons(ctx context.Context, to, bodyText, header, footer string, buttons []CTAButton) error {
-	ctaBtns := make([]ctaActionButton, 0, len(buttons))
-	for _, b := range buttons {
-		ctaBtns = append(ctaBtns, ctaActionButton{
-			Type:  "url",
-			URL:   b.URL,
-			Title: truncate(b.Title, 20),
-		})
-	}
+    for i, b := range buttons {
+        // Use the real body/header/footer only on the first message.
+        // Subsequent messages still need a non-empty body — use the button title.
+        msgBody := bodyText
+        msgHeader := header
+        msgFooter := footer
+        if i > 0 {
+            msgBody  = b.Title  // non-empty, satisfies Meta's requirement
+            msgHeader = ""
+            msgFooter = ""
+        }
 
-	msg := ctaBody{
-		MessagingProduct: "whatsapp",
-		To:               to,
-		Type:             "interactive",
-		Interactive: ctaInter{
-			Type:   "button",
-			Body:   interactText{Text: bodyText},
-			Action: ctaInterAction{Buttons: ctaBtns},
-		},
-	}
-	if header != "" {
-		msg.Interactive.Header = &interactHeader{Type: "text", Text: header}
-	}
-	if footer != "" {
-		msg.Interactive.Footer = &interactText{Text: footer}
-	}
-	return c.post(ctx, msg)
+        msg := ctaBody{
+            MessagingProduct: "whatsapp",
+            To:               to,
+            Type:             "interactive",
+            Interactive: ctaInter{
+                Type: "cta_url",
+                Body: interactText{Text: msgBody},
+                Action: ctaInterAction{
+                    Name: "cta_url",
+                    Parameters: ctaButtonParams{
+                        DisplayText: truncate(b.Title, 20),
+                        URL:         b.URL,
+                    },
+                },
+            },
+        }
+        if msgHeader != "" {
+            msg.Interactive.Header = &interactHeader{Type: "text", Text: msgHeader}
+        }
+        if msgFooter != "" {
+            msg.Interactive.Footer = &interactText{Text: msgFooter}
+        }
+        if err := c.post(ctx, msg); err != nil {
+            return err
+        }
+    }
+    return nil
 }
 
 // SendList sends a list-picker interactive message.
