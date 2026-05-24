@@ -186,29 +186,23 @@ func (m *Monitor) sessionLang(ctx context.Context, phone string) string {
 func InactivityMessage(lang string) string {
 	switch lang {
 	case "mr":
-		return `⏰ *सत्र कालबाह्य झाले*
+		return ` *अटलजनसेवाशी संपर्क साधल्याबद्दल धन्यवाद*
 
-असे दिसते की आपण काही वेळ निष्क्रिय होता.
+असे दिसते की आपण काही काळापासून सक्रिय नाही आहात।
 
-आपल्या सुरक्षिततेसाठी आपचे सत्र संपुष्टात आले आहे.
-
-पुन्हा सुरू करण्यासाठी *"Hi"* टाइप करा 🙏`
+पुढे सुरू ठेवण्यासाठी कृपया *"Hi"* लिहा, जेणेकरून आपण मुख्य मेनूपर्यंत पोहोचू शकाल 🙏`
 
 	case "hi":
-		return `⏰ *सत्र समाप्त हो गया*
+		return `*अटलजनसेवा से संपर्क करने के लिए धन्यवाद*
 
-ऐसा लगता है कि आप कुछ समय से निष्क्रिय थे.
+ऐसा प्रतीत होता है कि आप कुछ समय से सक्रिय नहीं हैं।
 
-आपकी सुरक्षा के लिए आपका सत्र समाप्त कर दिया गया है.
-
-फिर से शुरू करने के लिए *"Hi"* टाइप करें 🙏`
+आगे जारी रखने के लिए कृपया *"Hi"* लिखें, ताकि आप मुख्य सूची तक पहुँच सकें 🙏`
 
 	default: // "en" and unknown
-		return fmt.Sprintf(`⏰ *Session Timed Out*
+		return fmt.Sprintf(`*Thank You For Reaching to AtalJanseva*
 
 It seems you've been inactive for a while.
-
-For your security, your session has been cleared.
 
 To continue, please type *"Hi"* to access the main menu 🙏`)
 	}

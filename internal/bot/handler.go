@@ -225,58 +225,42 @@ func (h *Handler) handleWardReply(ctx context.Context, phone string, sess *store
 // ─────────────────────────────────────────────
 
 func (h *Handler) promptNagarsevak(ctx context.Context, phone string, sess *store.Session) {
-	nagarsevaks, err := h.repo.NagarsevaksByWard(ctx, sess.Pincode, sess.Ward)
-	if err != nil {
-		slog.Error("NagarsevaksByWard", "pin", sess.Pincode, "ward", sess.Ward, "err", err)
-		_ = h.wa.SendText(ctx, phone, "⚠️ Could not load nagarsevak data. Please try again.")
-		return
-	}
-	if len(nagarsevaks) == 0 {
-		_ = h.wa.SendText(ctx, phone, "⚠️ No nagarsevaks found for Ward "+sess.Ward+". Please choose a different ward.")
-		sess.Step = store.StepWardChosen
-		_ = h.store.Save(ctx, sess)
-		h.promptWard(ctx, phone, sess)
-		return
-	}
+    nagarsevaks, err := h.repo.NagarsevaksByWard(ctx, sess.Pincode, sess.Ward)
+    if err != nil {
+        slog.Error("NagarsevaksByWard", "pin", sess.Pincode, "ward", sess.Ward, "err", err)
+        _ = h.wa.SendText(ctx, phone, "⚠️ Could not load nagarsevak data. Please try again.")
+        return
+    }
+    if len(nagarsevaks) == 0 {
+        _ = h.wa.SendText(ctx, phone, "⚠️ No nagarsevaks found for Ward "+sess.Ward+". Please choose a different ward.")
+        sess.Step = store.StepWardChosen
+        _ = h.store.Save(ctx, sess)
+        h.promptWard(ctx, phone, sess)
+        return
+    }
 
-	t := h.t(sess)
+    t := h.t(sess)
 
-	// Send profile photo for each nagarsevak before the list.
-	// WhatsApp list rows don't support images — we send them as separate
-	// image messages so the user can see each candidate visually.
-	for _, ns := range nagarsevaks {
-		if ns.ProfilePhoto != "" {
-			name := ns.FullName
-			if sess.Lang != "en" && ns.NameHindi != "" {
-				name = ns.NameHindi
-			}
-			caption := fmt.Sprintf("🏅 *%s*\n🎖 %s  ·  🏙 Ward %s", name, ns.Party, ns.Ward)
-			if sendErr := h.wa.SendImage(ctx, phone, ns.ProfilePhoto, caption); sendErr != nil {
-				slog.Warn("promptNagarsevak: failed to send profile photo",
-					"phone", phone, "nagarsevak_id", ns.ID, "err", sendErr)
-			}
-		}
-	}
+    // ✅ No photo loop here anymore — photo moves to sendMainMenu after selection
 
-	// Build the selection list
-	rows := make([][3]string, 0, len(nagarsevaks))
-	for _, ns := range nagarsevaks {
-		name := ns.FullName
-		if sess.Lang != "en" && ns.NameHindi != "" {
-			name = ns.NameHindi
-		}
-		rows = append(rows, [3]string{
-			"ns_" + ns.ID,
-			name,
-			ns.Party + " · Ward " + ns.Ward,
-		})
-	}
+    rows := make([][3]string, 0, len(nagarsevaks))
+    for _, ns := range nagarsevaks {
+        name := ns.FullName
+        if sess.Lang != "en" && ns.NameHindi != "" {
+            name = ns.NameHindi
+        }
+        rows = append(rows, [3]string{
+            "ns_" + ns.ID,
+            name,
+            ns.Party + " · Ward " + ns.Ward,
+        })
+    }
 
-	if err := h.wa.SendList(ctx, phone, t.NagarsevakPrompt, "🏅 Select Nagarsevak", []whatsapp.ListSection{
-		{Title: "👥 Candidates", Rows: rows},
-	}); err != nil {
-		slog.Error("promptNagarsevak SendList", "phone", phone, "err", err)
-	}
+    if err := h.wa.SendList(ctx, phone, t.NagarsevakPrompt, "🏅 Select Nagarsevak", []whatsapp.ListSection{
+        {Title: "👥 Candidates", Rows: rows},
+    }); err != nil {
+        slog.Error("promptNagarsevak SendList", "phone", phone, "err", err)
+    }
 }
 
 func (h *Handler) handleNagarsevakReply(ctx context.Context, phone string, sess *store.Session, ir *whatsapp.InteractiveReply) {
@@ -315,21 +299,42 @@ func nagarsevakURL(slug, suffix string) string {
 }
 
 func (h *Handler) sendMainMenu(ctx context.Context, phone string, sess *store.Session) {
-	t := h.t(sess)
+    t := h.t(sess)
 
-	// TASK 2 – each button is a URL redirect built from the nagarsevak's slug.
-	ctaButtons := []whatsapp.CTAButton{
-		{Title: t.LabelSOS,      URL: nagarsevakURL(sess.NagarsevakSlug, "sos")},
-		{Title: t.LabelRegister, URL: nagarsevakURL(sess.NagarsevakSlug, "grievance")},
-		{Title: t.LabelTrack,    URL: nagarsevakURL(sess.NagarsevakSlug, "track-issue")},
-	}
+    ns, err := h.repo.NagarsevakByID(ctx, sess.NagarsevakID)
+    if err != nil {
+        slog.Error("sendMainMenu: NagarsevakByID", "phone", phone, "err", err)
+        ns = &db.Nagarsevak{
+            FullName:     sess.NagarsevakName,
+            ProfilePhoto: "",
+        }
+    }
 
-	header := "🏛 Ataljanseva Citizen Service"
-	footer := fmt.Sprintf("📋 Nagarsevak: %s", sess.NagarsevakName)
+    // 1. If photo exists, send it with nagarsevak details as caption
+    //    This appears at the top of the "card" the user sees.
+    if ns.ProfilePhoto != "" {
+        caption := fmt.Sprintf("🏅 *%s*\n🎖 %s  ·  🏙 Ward %s",
+            ns.FullName, ns.Party, ns.Ward)
+        if err := h.wa.SendImage(ctx, phone, ns.ProfilePhoto, caption); err != nil {
+            slog.Warn("sendMainMenu: profile photo send failed", "phone", phone, "err", err)
+        }
+    }
 
-	if err := h.wa.SendCTAButtons(ctx, phone, t.Welcome, header, footer, ctaButtons); err != nil {
-		slog.Error("sendMainMenu SendCTAButtons", "phone", phone, "err", err)
-	}
+    // 2. Welcome message body
+    footer := fmt.Sprintf("📋 Nagarsevak: %s", sess.NagarsevakName)
+    if err := h.wa.SendText(ctx, phone, t.Welcome); err != nil {
+        slog.Error("sendMainMenu: SendText", "phone", phone, "err", err)
+    }
+
+    // 3. CTA URL action buttons
+    ctaButtons := []whatsapp.CTAButton{
+        {Title: t.LabelSOS,      URL: nagarsevakURL(sess.NagarsevakSlug, "sos")},
+        {Title: t.LabelRegister, URL: nagarsevakURL(sess.NagarsevakSlug, "grievance")},
+        {Title: t.LabelTrack,    URL: nagarsevakURL(sess.NagarsevakSlug, "track-issue")},
+    }
+    if err := h.wa.SendCTAButtons(ctx, phone, t.LabelSOS, "", footer, ctaButtons); err != nil {
+        slog.Error("sendMainMenu SendCTAButtons", "phone", phone, "err", err)
+    }
 }
 
 // handleMainMenuSelection handles cases where the user somehow sends an

@@ -112,12 +112,6 @@ Your Nagarsevak has been linked to your account.
 Your bridge to local governance
 ━━━━━━━━━━━━━━━━━━━━━
 
-Here's what you can do:
-  🆘 Lodge emergency SOS complaints
-  📝 File general civic complaints
-  🔍 Track your complaint status
-  📊 View ward reports & events
-
 🌐 _ataljanseva.in_
 
 How can we help you today? 👇`,
@@ -175,12 +169,6 @@ _उदाहरण: ४११००१, ४००००१, ४४०००१,
 स्थानिक प्रशासनाशी आपला सेतू
 ━━━━━━━━━━━━━━━━━━━━━━
 
-आपण येथे करू शकता:
-  🆘 आपत्कालीन SOS तक्रार नोंदवा
-  📝 साधारण नागरी तक्रार नोंदवा
-  🔍 तक्रारीची स्थिती जाणून घ्या
-  📊 प्रभाग अहवाल व कार्यक्रम पहा
-
 🌐 _ataljanseva.in_
 
 आज आपण काय करू इच्छिता? 👇`,
@@ -237,12 +225,6 @@ _उदाहरण: ४११००१, ४००००१, ४४०००१,
 *अटलजनसेवा नागरिक सेवा*
 स्थानीय प्रशासन से आपका सेतु
 ━━━━━━━━━━━━━━━━━━━━━━
-
-आप यहाँ कर सकते हैं:
-  🆘 आपातकालीन SOS शिकायत दर्ज करें
-  📝 सामान्य नागरिक शिकायत दर्ज करें
-  🔍 अपनी शिकायत की स्थिति जानें
-  📊 वार्ड रिपोर्ट और कार्यक्रम देखें
 
 🌐 _ataljanseva.in_
 
