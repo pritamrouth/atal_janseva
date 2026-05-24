@@ -144,21 +144,37 @@ func (h *Handler) sendLanguagePicker(ctx context.Context, phone, rawPhone string
 // ─────────────────────────────────────────────
 
 func (h *Handler) handlePin(ctx context.Context, phone string, sess *store.Session, pin string) {
-	if len(pin) != 6 {
+	pin = strings.TrimSpace(pin)
+
+	// Normalize to ASCII only for length validation
+	asciiPin := normalizePin(pin)
+	if len([]rune(asciiPin)) != 6 {
 		_ = h.wa.SendText(ctx, phone, h.t(sess).InvalidPin)
 		return
 	}
-	loc, err := h.repo.LocationByPincode(ctx, pin)
+
+	var loc *db.LocationInfo
+	var err error
+	if sess.Lang == "mr" || sess.Lang == "hi" {
+		// Query pincode_hindi column using the original Devanagari input
+		loc, err = h.repo.LocationByPincodeHindi(ctx, pin)
+		// Store the ASCII version in session for downstream ward/nagarsevak queries
+		sess.Pincode = pin // keep Devanagari — all Hindi queries use pincode_hindi
+	} else {
+		loc, err = h.repo.LocationByPincode(ctx, asciiPin)
+		sess.Pincode = asciiPin
+	}
+
 	if err == sql.ErrNoRows {
 		_ = h.wa.SendText(ctx, phone, h.t(sess).InvalidPin)
 		return
 	}
 	if err != nil {
-		slog.Error("LocationByPincode", "pin", pin, "err", err)
+		slog.Error("LocationByPincode", "pin", pin, "lang", sess.Lang, "err", err)
 		_ = h.wa.SendText(ctx, phone, "⚠️ Database error, please try again shortly.")
 		return
 	}
-	sess.Pincode = pin
+
 	sess.State = loc.State
 	sess.District = loc.District
 	sess.Step = store.StepWardChosen
@@ -174,7 +190,14 @@ func (h *Handler) handlePin(ctx context.Context, phone string, sess *store.Sessi
 // ─────────────────────────────────────────────
 
 func (h *Handler) promptWard(ctx context.Context, phone string, sess *store.Session) {
-	wards, err := h.repo.WardsByPincode(ctx, sess.Pincode)
+	var wards []db.Ward
+	var err error
+	if sess.Lang == "mr" || sess.Lang == "hi" {
+		wards, err = h.repo.WardsByPincodeHindi(ctx, sess.Pincode)
+	} else {
+		wards, err = h.repo.WardsByPincode(ctx, sess.Pincode)
+	}
+	
 	if err != nil {
 		slog.Error("WardsByPincode", "pin", sess.Pincode, "err", err)
 		_ = h.wa.SendText(ctx, phone, "⚠️ Could not load ward data. Please try again.")
@@ -225,8 +248,15 @@ func (h *Handler) handleWardReply(ctx context.Context, phone string, sess *store
 // ─────────────────────────────────────────────
 
 func (h *Handler) promptNagarsevak(ctx context.Context, phone string, sess *store.Session) {
-    nagarsevaks, err := h.repo.NagarsevaksByWard(ctx, sess.Pincode, sess.Ward)
-    if err != nil {
+	var nagarsevaks []db.Nagarsevak
+	var err error
+	if sess.Lang == "mr" || sess.Lang == "hi" {
+		nagarsevaks, err = h.repo.NagarsevaksByWardHindi(ctx, sess.Pincode, sess.Ward)
+	} else {
+		nagarsevaks, err = h.repo.NagarsevaksByWard(ctx, sess.Pincode, sess.Ward)
+	}
+	
+	if err != nil {
         slog.Error("NagarsevaksByWard", "pin", sess.Pincode, "ward", sess.Ward, "err", err)
         _ = h.wa.SendText(ctx, phone, "⚠️ Could not load nagarsevak data. Please try again.")
         return
@@ -377,4 +407,17 @@ func listID(ir *whatsapp.InteractiveReply) string {
 		return ""
 	}
 	return ir.ListReply.ID
+}
+
+func normalizePin(s string) string {
+	s = strings.TrimSpace(s)
+	var b strings.Builder
+	for _, r := range s {
+		if r >= '०' && r <= '९' {
+			b.WriteRune('0' + (r - '०'))
+		} else {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
 }
