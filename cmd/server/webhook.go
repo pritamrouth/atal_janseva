@@ -3,20 +3,19 @@ package main
 import (
 	"encoding/json"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 
-	"github.com/ataljanseva/whatsapp-bot/internal/bot"
 	"github.com/ataljanseva/whatsapp-bot/internal/whatsapp"
+	"github.com/ataljanseva/whatsapp-bot/internal/worker"
 )
 
-// webhookHandler handles both GET (hub verification) and POST (inbound events).
+// webhookHandler handles GET (hub verification) and POST (inbound events).
 type webhookHandler struct {
 	verifyToken string
-	bot         *bot.Handler
+	pool        *worker.Pool
 }
 
-// ServeHTTP dispatches GET / POST accordingly.
 func (wh *webhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
@@ -28,10 +27,7 @@ func (wh *webhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// ─────────────────────────────────────────────
-// GET /webhook  – hub.challenge verification
-// ─────────────────────────────────────────────
-
+// GET /webhook – hub.challenge verification
 func (wh *webhookHandler) verify(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	mode      := q.Get("hub.mode")
@@ -39,30 +35,27 @@ func (wh *webhookHandler) verify(w http.ResponseWriter, r *http.Request) {
 	challenge := q.Get("hub.challenge")
 
 	if mode == "subscribe" && token == wh.verifyToken {
-		log.Printf("[webhook] hub verification OK")
+		slog.Info("webhook hub verification OK")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(challenge))
 		return
 	}
-	log.Printf("[webhook] hub verification FAILED (mode=%q token=%q)", mode, token)
+	slog.Warn("webhook hub verification FAILED", "mode", mode)
 	http.Error(w, "Forbidden", http.StatusForbidden)
 }
 
-// ─────────────────────────────────────────────
-// POST /webhook  – inbound messages
-// ─────────────────────────────────────────────
-
+// POST /webhook – inbound messages.
+// Responds 200 immediately, enqueues work to the pool.
 func (wh *webhookHandler) receive(w http.ResponseWriter, r *http.Request) {
-	// Always acknowledge immediately – Meta retries if it doesn't get 200 within 20s.
+	// ACK Meta immediately – must be within 20s or Meta will retry
 	w.WriteHeader(http.StatusOK)
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		log.Printf("[webhook] read body: %v", err)
+		slog.Error("webhook read body", "err", err)
 		return
 	}
 
-	// Quick guard: only process "whatsapp_business_account" events
 	var probe struct {
 		Object string `json:"object"`
 	}
@@ -72,12 +65,12 @@ func (wh *webhookHandler) receive(w http.ResponseWriter, r *http.Request) {
 
 	payload, err := whatsapp.Parse(body)
 	if err != nil {
-		log.Printf("[webhook] parse: %v", err)
+		slog.Error("webhook parse", "err", err)
 		return
 	}
 
 	for _, msg := range payload.Messages() {
-		log.Printf("[webhook] msg from=%s type=%s", msg.From, msg.Type)
-		wh.bot.HandleRaw(msg)
+		slog.Info("message received", "from", msg.From, "type", msg.Type)
+		wh.pool.Enqueue(msg)
 	}
 }

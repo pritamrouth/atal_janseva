@@ -1,49 +1,61 @@
-// Package bot implements the Ataljanseva onboarding conversation flow
-// driven by live data from PostgreSQL.
+// Package bot implements the Ataljanseva onboarding conversation flow.
+// All operations are context-aware for proper timeout/cancellation propagation.
 package bot
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
-	"log"
+	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/ataljanseva/whatsapp-bot/internal/db"
 	"github.com/ataljanseva/whatsapp-bot/internal/store"
 	"github.com/ataljanseva/whatsapp-bot/internal/whatsapp"
 )
 
-// Handler processes inbound WhatsApp messages and drives the flow forward.
+// jobTimeout is the max time a single message may take end-to-end.
+const jobTimeout = 12 * time.Second
+
+// Handler processes inbound WhatsApp messages.
 type Handler struct {
 	wa    *whatsapp.Client
 	store *store.Store
 	repo  *db.Repo
 }
 
-// New returns a Handler wired to a WhatsApp client, session store, and DB repo.
+// New returns a Handler.
 func New(wa *whatsapp.Client, s *store.Store, repo *db.Repo) *Handler {
 	return &Handler{wa: wa, store: s, repo: repo}
 }
 
-// ─────────────────────────────────────────────
-// Entry point
-// ─────────────────────────────────────────────
-
-// HandleRaw dispatches a single inbound message through the state machine.
+// HandleRaw is the worker entry-point: one call per inbound message.
 func (h *Handler) HandleRaw(msg whatsapp.Message) {
+	ctx, cancel := context.WithTimeout(context.Background(), jobTimeout)
+	defer cancel()
+
+	log := slog.With("phone", msg.From, "type", msg.Type)
+
 	phone := msg.From
-	sess := h.store.Get(phone)
+
+	sess, err := h.store.Get(ctx, phone)
+	if err != nil {
+		log.Error("get session", "err", err)
+		return
+	}
 
 	// Global reset
 	if msg.Type == "text" && strings.EqualFold(strings.TrimSpace(msg.Text.Body), "reset") {
-		h.store.Reset(phone)
-		_ = h.wa.SendText(phone, "🔄 Session reset. Type anything to start over.")
+		if err := h.store.Reset(ctx, phone); err != nil {
+			log.Error("reset session", "err", err)
+		}
+		_ = h.wa.SendText(ctx, phone, "🔄 Session reset. Type anything to start over.")
 		return
 	}
 
 	switch sess.Step {
 
-	// ── STEP 0: show language picker ──────────────────────
 	case store.StepStart:
 		if msg.Type == "interactive" && msg.Interactive != nil {
 			id := buttonID(msg.Interactive)
@@ -55,46 +67,45 @@ func (h *Handler) HandleRaw(msg whatsapp.Message) {
 			case "lang_hi":
 				sess.Lang = "hi"
 			default:
-				h.sendLanguagePicker(phone)
+				h.sendLanguagePicker(ctx, phone)
 				return
 			}
 			sess.Step = store.StepLangChosen
-			h.store.Save(sess)
-			_ = h.wa.SendText(phone, h.t(sess).PinPrompt)
+			if err := h.store.Save(ctx, sess); err != nil {
+				log.Error("save session", "err", err)
+				return
+			}
+			_ = h.wa.SendText(ctx, phone, h.t(sess).PinPrompt)
 		} else {
-			h.sendLanguagePicker(phone)
+			h.sendLanguagePicker(ctx, phone)
 		}
 
-	// ── STEP 1: waiting for PIN ───────────────────────────
 	case store.StepLangChosen:
 		if msg.Type == "text" {
-			h.handlePin(phone, sess, strings.TrimSpace(msg.Text.Body))
+			h.handlePin(ctx, phone, sess, strings.TrimSpace(msg.Text.Body))
 		} else {
-			_ = h.wa.SendText(phone, h.t(sess).PinPrompt)
+			_ = h.wa.SendText(ctx, phone, h.t(sess).PinPrompt)
 		}
 
-	// ── STEP 2: ward selection ────────────────────────────
 	case store.StepWardChosen:
 		if msg.Type == "interactive" && msg.Interactive != nil {
-			h.handleWardReply(phone, sess, msg.Interactive)
+			h.handleWardReply(ctx, phone, sess, msg.Interactive)
 		} else {
-			h.promptWard(phone, sess)
+			h.promptWard(ctx, phone, sess)
 		}
 
-	// ── STEP 3: nagarsevak selection ─────────────────────
 	case store.StepNagarsevak:
 		if msg.Type == "interactive" && msg.Interactive != nil {
-			h.handleNagarsevakReply(phone, sess, msg.Interactive)
+			h.handleNagarsevakReply(ctx, phone, sess, msg.Interactive)
 		} else {
-			h.promptNagarsevak(phone, sess)
+			h.promptNagarsevak(ctx, phone, sess)
 		}
 
-	// ── STEP 4: main menu ────────────────────────────────
 	case store.StepMainMenu:
 		if msg.Type == "interactive" && msg.Interactive != nil {
-			h.handleMainMenuSelection(phone, sess, msg.Interactive)
+			h.handleMainMenuSelection(ctx, phone, sess, msg.Interactive)
 		} else {
-			h.sendMainMenu(phone, sess)
+			h.sendMainMenu(ctx, phone, sess)
 		}
 	}
 }
@@ -103,187 +114,174 @@ func (h *Handler) HandleRaw(msg whatsapp.Message) {
 // Step 0 – language picker
 // ─────────────────────────────────────────────
 
-func (h *Handler) sendLanguagePicker(phone string) {
-	err := h.wa.SendButtons(phone, I18n["en"].Greeting, [][2]string{
+func (h *Handler) sendLanguagePicker(ctx context.Context, phone string) {
+	err := h.wa.SendButtons(ctx, phone, I18n["en"].Greeting, [][2]string{
 		{"lang_en", "🇬🇧 English"},
 		{"lang_mr", "🇮🇳 मराठी"},
 		{"lang_hi", "🇮🇳 हिंदी"},
 	})
 	if err != nil {
-		log.Printf("[bot] sendLanguagePicker %s: %v", phone, err)
+		slog.Error("sendLanguagePicker", "phone", phone, "err", err)
 	}
 }
 
 // ─────────────────────────────────────────────
-// Step 1 – PIN → DB lookup
+// Step 1 – PIN → DB
 // ─────────────────────────────────────────────
 
-func (h *Handler) handlePin(phone string, sess *store.Session, pin string) {
-	// Validate: must be 6 digits
+func (h *Handler) handlePin(ctx context.Context, phone string, sess *store.Session, pin string) {
 	if len(pin) != 6 {
-		_ = h.wa.SendText(phone, h.t(sess).InvalidPin)
+		_ = h.wa.SendText(ctx, phone, h.t(sess).InvalidPin)
 		return
 	}
-
-	loc, err := h.repo.LocationByPincode(pin)
+	loc, err := h.repo.LocationByPincode(ctx, pin)
 	if err == sql.ErrNoRows {
-		_ = h.wa.SendText(phone, h.t(sess).InvalidPin)
+		_ = h.wa.SendText(ctx, phone, h.t(sess).InvalidPin)
 		return
 	}
 	if err != nil {
-		log.Printf("[bot] LocationByPincode %s: %v", pin, err)
-		_ = h.wa.SendText(phone, "⚠️ A database error occurred. Please try again shortly.")
+		slog.Error("LocationByPincode", "pin", pin, "err", err)
+		_ = h.wa.SendText(ctx, phone, "⚠️ Database error, please try again shortly.")
 		return
 	}
-
 	sess.Pincode = pin
 	sess.State = loc.State
 	sess.District = loc.District
 	sess.Step = store.StepWardChosen
-	h.store.Save(sess)
-	h.promptWard(phone, sess)
+	if err := h.store.Save(ctx, sess); err != nil {
+		slog.Error("save session", "phone", phone, "err", err)
+		return
+	}
+	h.promptWard(ctx, phone, sess)
 }
 
 // ─────────────────────────────────────────────
-// Step 2 – ward list from DB
+// Step 2 – ward list
 // ─────────────────────────────────────────────
 
-func (h *Handler) promptWard(phone string, sess *store.Session) {
-	wards, err := h.repo.WardsByPincode(sess.Pincode)
+func (h *Handler) promptWard(ctx context.Context, phone string, sess *store.Session) {
+	wards, err := h.repo.WardsByPincode(ctx, sess.Pincode)
 	if err != nil {
-		log.Printf("[bot] WardsByPincode %s: %v", sess.Pincode, err)
-		_ = h.wa.SendText(phone, "⚠️ Could not load ward data. Please try again.")
+		slog.Error("WardsByPincode", "pin", sess.Pincode, "err", err)
+		_ = h.wa.SendText(ctx, phone, "⚠️ Could not load ward data. Please try again.")
 		return
 	}
 	if len(wards) == 0 {
-		_ = h.wa.SendText(phone, "⚠️ No wards found for this PIN code. Please check and re-enter.")
-		// Roll back to PIN prompt
+		_ = h.wa.SendText(ctx, phone, "⚠️ No wards found for this PIN. Please re-enter your PIN.")
 		sess.Step = store.StepLangChosen
-		h.store.Save(sess)
+		_ = h.store.Save(ctx, sess)
 		return
 	}
 
 	t := h.t(sess)
-
-	// Localise state / district label
-	stateLabel, districtLabel := sess.State, sess.District
-
 	rows := make([][3]string, 0, len(wards))
 	for _, w := range wards {
 		label := w.Code
 		if sess.Lang != "en" && w.CodeHindi != "" {
 			label = w.Code + " (" + w.CodeHindi + ")"
 		}
-		rows = append(rows, [3]string{
-			"ward_" + w.Code, // id — ward code is unique per pincode
-			label,
-			"",
-		})
+		rows = append(rows, [3]string{"ward_" + w.Code, label, ""})
 	}
 
-	bodyText := fmt.Sprintf(t.WardPrompt, stateLabel, districtLabel)
-	err = h.wa.SendList(phone, bodyText, "Select Ward", []whatsapp.ListSection{
+	bodyText := fmt.Sprintf(t.WardPrompt, sess.State, sess.District)
+	if err := h.wa.SendList(ctx, phone, bodyText, "Select Ward", []whatsapp.ListSection{
 		{Title: "Available Wards", Rows: rows},
-	})
-	if err != nil {
-		log.Printf("[bot] promptWard SendList %s: %v", phone, err)
+	}); err != nil {
+		slog.Error("promptWard SendList", "phone", phone, "err", err)
 	}
 }
 
-func (h *Handler) handleWardReply(phone string, sess *store.Session, ir *whatsapp.InteractiveReply) {
+func (h *Handler) handleWardReply(ctx context.Context, phone string, sess *store.Session, ir *whatsapp.InteractiveReply) {
 	id := listID(ir)
 	if !strings.HasPrefix(id, "ward_") {
-		h.promptWard(phone, sess)
+		h.promptWard(ctx, phone, sess)
 		return
 	}
-	wardCode := strings.TrimPrefix(id, "ward_")
-	sess.Ward = wardCode
+	sess.Ward = strings.TrimPrefix(id, "ward_")
 	sess.Step = store.StepNagarsevak
-	h.store.Save(sess)
-	h.promptNagarsevak(phone, sess)
+	if err := h.store.Save(ctx, sess); err != nil {
+		slog.Error("save session", "phone", phone, "err", err)
+		return
+	}
+	h.promptNagarsevak(ctx, phone, sess)
 }
 
 // ─────────────────────────────────────────────
-// Step 3 – nagarsevak list from DB
+// Step 3 – nagarsevak list
 // ─────────────────────────────────────────────
 
-func (h *Handler) promptNagarsevak(phone string, sess *store.Session) {
-	nagarsevaks, err := h.repo.NagarsevaksByWard(sess.Pincode, sess.Ward)
+func (h *Handler) promptNagarsevak(ctx context.Context, phone string, sess *store.Session) {
+	nagarsevaks, err := h.repo.NagarsevaksByWard(ctx, sess.Pincode, sess.Ward)
 	if err != nil {
-		log.Printf("[bot] NagarsevaksByWard pin=%s ward=%s: %v", sess.Pincode, sess.Ward, err)
-		_ = h.wa.SendText(phone, "⚠️ Could not load nagarsevak data. Please try again.")
+		slog.Error("NagarsevaksByWard", "pin", sess.Pincode, "ward", sess.Ward, "err", err)
+		_ = h.wa.SendText(ctx, phone, "⚠️ Could not load nagarsevak data. Please try again.")
 		return
 	}
 	if len(nagarsevaks) == 0 {
-		_ = h.wa.SendText(phone, "⚠️ No nagarsevaks found for Ward "+sess.Ward+". Please select a different ward.")
+		_ = h.wa.SendText(ctx, phone, "⚠️ No nagarsevaks found for Ward "+sess.Ward+". Please choose a different ward.")
 		sess.Step = store.StepWardChosen
-		h.store.Save(sess)
-		h.promptWard(phone, sess)
+		_ = h.store.Save(ctx, sess)
+		h.promptWard(ctx, phone, sess)
 		return
 	}
 
 	t := h.t(sess)
 	rows := make([][3]string, 0, len(nagarsevaks))
 	for _, ns := range nagarsevaks {
-		displayName := ns.FullName
+		name := ns.FullName
 		if sess.Lang != "en" && ns.NameHindi != "" {
-			displayName = ns.NameHindi
+			name = ns.NameHindi
 		}
-		rows = append(rows, [3]string{
-			"ns_" + ns.ID,
-			displayName,
-			ns.Party + " · Ward " + ns.Ward,
-		})
+		rows = append(rows, [3]string{"ns_" + ns.ID, name, ns.Party + " · Ward " + ns.Ward})
 	}
 
-	err = h.wa.SendList(phone, t.NagarsevakPrompt, "Select Nagarsevak", []whatsapp.ListSection{
-		{Title: "Nagarsevaks", Rows: rows},
-	})
-	if err != nil {
-		log.Printf("[bot] promptNagarsevak SendList %s: %v", phone, err)
+	if err := h.wa.SendList(ctx, phone, t.NagarsevakPrompt, "Select Nagarsevak", []whatsapp.ListSection{
+		{Title: "political_users", Rows: rows},
+	}); err != nil {
+		slog.Error("promptNagarsevak SendList", "phone", phone, "err", err)
 	}
 }
 
-func (h *Handler) handleNagarsevakReply(phone string, sess *store.Session, ir *whatsapp.InteractiveReply) {
+func (h *Handler) handleNagarsevakReply(ctx context.Context, phone string, sess *store.Session, ir *whatsapp.InteractiveReply) {
 	id := listID(ir)
 	if !strings.HasPrefix(id, "ns_") {
-		h.promptNagarsevak(phone, sess)
+		h.promptNagarsevak(ctx, phone, sess)
 		return
 	}
 	nsID := strings.TrimPrefix(id, "ns_")
-
-	ns, err := h.repo.NagarsevakByID(nsID)
+	ns, err := h.repo.NagarsevakByID(ctx, nsID)
 	if err != nil {
-		log.Printf("[bot] NagarsevakByID %s: %v", nsID, err)
-		_ = h.wa.SendText(phone, "⚠️ Could not find the selected nagarsevak. Please try again.")
-		h.promptNagarsevak(phone, sess)
+		slog.Error("NagarsevakByID", "id", nsID, "err", err)
+		_ = h.wa.SendText(ctx, phone, "⚠️ Could not find the selected nagarsevak. Please try again.")
+		h.promptNagarsevak(ctx, phone, sess)
 		return
 	}
-
 	sess.NagarsevakID = ns.ID
 	sess.NagarsevakName = ns.FullName
 	sess.Step = store.StepMainMenu
-	h.store.Save(sess)
-	h.sendMainMenu(phone, sess)
+	if err := h.store.Save(ctx, sess); err != nil {
+		slog.Error("save session", "phone", phone, "err", err)
+		return
+	}
+	h.sendMainMenu(ctx, phone, sess)
 }
 
 // ─────────────────────────────────────────────
 // Step 4 – main menu
 // ─────────────────────────────────────────────
 
-func (h *Handler) sendMainMenu(phone string, sess *store.Session) {
+func (h *Handler) sendMainMenu(ctx context.Context, phone string, sess *store.Session) {
 	t := h.t(sess)
-	err := h.wa.SendButtons(phone, t.Welcome, [][2]string{
+	if err := h.wa.SendButtons(ctx, phone, t.Welcome, [][2]string{
 		{"action_sos", t.LabelSOS},
 		{"action_register", t.LabelRegister},
 		{"action_track", t.LabelTrack},
-	})
-	if err != nil {
-		log.Printf("[bot] sendMainMenu %s: %v", phone, err)
+	}); err != nil {
+		slog.Error("sendMainMenu", "phone", phone, "err", err)
 	}
 }
 
-func (h *Handler) handleMainMenuSelection(phone string, sess *store.Session, ir *whatsapp.InteractiveReply) {
+func (h *Handler) handleMainMenuSelection(ctx context.Context, phone string, sess *store.Session, ir *whatsapp.InteractiveReply) {
 	id := buttonID(ir)
 	t := h.t(sess)
 
@@ -296,30 +294,26 @@ func (h *Handler) handleMainMenuSelection(phone string, sess *store.Session, ir 
 	case "action_track":
 		label, handler = t.LabelTrack, "Track"
 	default:
-		h.sendMainMenu(phone, sess)
+		h.sendMainMenu(ctx, phone, sess)
 		return
 	}
 
-	// ── TODO: replace with real sub-flow handlers ──────────
-	confirmation := fmt.Sprintf(
-		"✅ You selected *%s*.\n\n_Nagarsevak: %s_\n_Ward: %s_\n\n_Plug in your %s sub-flow handler in bot/handler.go._\n\nType anything to return to the main menu.",
+	// ── TODO: replace with real sub-flow handlers ─────────────────────────────
+	msg := fmt.Sprintf(
+		"✅ You selected *%s*.\n\n_Nagarsevak: %s | Ward: %s_\n\n_Plug in your %s sub-flow in bot/handler.go._\n\nType anything to return to the main menu.",
 		label, sess.NagarsevakName, sess.Ward, handler,
 	)
-	_ = h.wa.SendText(phone, confirmation)
+	_ = h.wa.SendText(ctx, phone, msg)
 	sess.Step = store.StepMainMenu
-	h.store.Save(sess)
+	_ = h.store.Save(ctx, sess)
 }
 
 // ─────────────────────────────────────────────
-// Utilities
+// Helpers
 // ─────────────────────────────────────────────
 
 func (h *Handler) t(sess *store.Session) Strings {
-	lang := sess.Lang
-	if lang == "" {
-		lang = "en"
-	}
-	if t, ok := I18n[lang]; ok {
+	if t, ok := I18n[sess.Lang]; ok {
 		return t
 	}
 	return I18n["en"]

@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 )
 
 // Config holds all runtime configuration loaded from environment variables.
@@ -13,7 +14,18 @@ type Config struct {
 	WAVerifyToken   string
 
 	// PostgreSQL
-	DatabaseURL string // postgres://user:pass@host:5432/dbname?sslmode=disable
+	DatabaseURL     string
+	DBMaxOpenConns  int
+	DBMaxIdleConns  int
+
+	// Redis (local)
+	RedisAddr     string // e.g. localhost:6379
+	RedisPassword string // empty string = no auth
+	RedisDB       int    // default 0
+
+	// Worker pool
+	WorkerCount   int // number of concurrent message-processing goroutines
+	QueueDepth    int // buffered channel depth
 
 	// Server
 	Port string
@@ -26,7 +38,14 @@ func Load() (*Config, error) {
 		WAAccessToken:   os.Getenv("WA_ACCESS_TOKEN"),
 		WAVerifyToken:   os.Getenv("WA_VERIFY_TOKEN"),
 		DatabaseURL:     os.Getenv("DATABASE_URL"),
-		Port:            os.Getenv("PORT"),
+		RedisAddr:       getEnvOr("REDIS_ADDR", "localhost:6379"),
+		RedisPassword:   os.Getenv("REDIS_PASSWORD"),
+		RedisDB:         getEnvInt("REDIS_DB", 0),
+		DBMaxOpenConns:  getEnvInt("DB_MAX_OPEN_CONNS", 25),
+		DBMaxIdleConns:  getEnvInt("DB_MAX_IDLE_CONNS", 10),
+		WorkerCount:     getEnvInt("WORKER_COUNT", 50),
+		QueueDepth:      getEnvInt("QUEUE_DEPTH", 2000),
+		Port:            getEnvOr("PORT", "8080"),
 	}
 	if c.WAPhoneNumberID == "" {
 		return nil, fmt.Errorf("WA_PHONE_NUMBER_ID is required")
@@ -40,8 +59,21 @@ func Load() (*Config, error) {
 	if c.DatabaseURL == "" {
 		return nil, fmt.Errorf("DATABASE_URL is required")
 	}
-	if c.Port == "" {
-		c.Port = "8080"
-	}
 	return c, nil
+}
+
+func getEnvOr(key, def string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return def
+}
+
+func getEnvInt(key string, def int) int {
+	if v := os.Getenv(key); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			return n
+		}
+	}
+	return def
 }
