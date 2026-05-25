@@ -66,34 +66,26 @@ func formatPhone(raw string) string {
 // so the user's real number is injected at runtime.
 var I18n = map[string]Strings{
 	"en": {
-		PinPrompt: `✅ Great! You've selected *English*.
+		PinPrompt: `This is the *Ataljanseva Citizen Service* Automatic Reply Chatbot for citizen support and assistance.
 
-──────────────────────
-🔍 *Find Your Nagarsevak*
-──────────────────────
-Please enter your *6-digit PIN code* to locate the civic representatives in your area:
+To continue further, please search for your respective Corporator.
 
-_Example: 401107, 401303_`,
+Please enter your *6-digit PIN Code* and *Ward Number* in the following format:
 
-		InvalidPin: `⚠️ *PIN Code Not Found*
+📍 *PIN Code, Ward Number*
+Example: *400601, TES1*`,
 
-The PIN code you entered doesn't match any records in our database.
+		InvalidPin: `⚠️ The entered PIN Code and Ward Number *%s* could not be found or do not match our records.
 
-Please try one of these valid demo PINs:
-  📍 *401107* — Mumbai City
-  📍 *401303* — Nagpur
+Please re-enter the correct *6-digit PIN Code* and *Ward Number* to continue.
 
+📍 *PIN Code, Ward Number*
+Example: *400601, TES1*`,
 
-Please type your *6-digit PIN code* again:`,
+		WardPrompt: `✅ You entered PIN Code and Ward Number *%s and %s* successfully.
 
-		WardPrompt: `📍 *Location Identified!*
+Please select your Corporator from the list below 👇`,
 
-┌───────────────────┐
-  🏛  *State:*     %s
-  🏙  *District:*  %s
-└───────────────────┘
-
-Your area has been found. Please select your *Ward* from the list below to continue 👇`,
 
 		NagarsevakPrompt: `🏅 *Select Your Nagarsevak*
 
@@ -120,33 +112,24 @@ How can we help you today? 👇`,
 	},
 
 	"mr": {
-		PinPrompt: `✅ उत्तम! आपण *मराठी* निवडली.
+		PinPrompt: `ही नागरिक सहायता व सेवांसाठी *अटलजनसेवा नागरिक सेवेची* अधिकृत ऑटोमॅटिक रिप्लाय चॅटबॉट सेवा आहे.
 
-──────────────────────
-🔍 *नगरसेवक शोधा*
-──────────────────────
-आपल्या परिसरातील नगरसेवक शोधण्यासाठी कृपया आपला *६-अंकी पिन कोड* टाइप करा:
+आपल्या संबंधित नगरसेवकाचा शोध घेण्यासाठी, कृपया ६ अंकी पिन कोड आणि आपला प्रभाग क्रमांक प्रविष्ट करा.
 
-_उदाहरण: ४०११०७, ४०१३०३_`,
+📍 *पिन कोड, प्रभाग क्रमांक*
+उदाहरण: *400601, TES1*`,
 
-		InvalidPin: `⚠️ *पिन कोड सापडला नाही*
+		InvalidPin: `⚠️ प्रविष्ट केलेला पिन कोड आणि प्रभाग क्रमांक *%s* आमच्या नोंदींशी जुळत नाही किंवा सापडला नाही.
 
-आपण दिलेला पिन कोड आमच्या नोंदींमध्ये उपलब्ध नाही.
+कृपया पुढे जाण्यासाठी योग्य *६ अंकी पिन कोड* आणि *प्रभाग क्रमांक* पुन्हा प्रविष्ट करा.
 
-कृपया हे वैध डेमो पिन वापरा:
-  📍 *४०११०७* — ठाणे
-  📍 *४०१३०३* — पालघर
+📍 *पिन कोड, प्रभाग क्रमांक*
+उदाहरण: *400601, TES1*`,
 
-कृपया पुन्हा *६-अंकी पिन कोड* टाइप करा:`,
+		WardPrompt: `✅ आपण पिन कोड आणि प्रभाग क्रमांक *%s आणि %s* यशस्वीरित्या प्रविष्ट केले आहेत.
 
-		WardPrompt: `📍 *आपले स्थान सापडले!*
+कृपया खालील यादीतून आपल्या नगरसेवकाची निवड करा 👇`,
 
-┌─────────────────────┐
-  🏛  *राज्य:*    %s
-  🏙  *जिल्हा:*   %s
-└─────────────────────┘
-
-आपला परिसर सापडला. पुढे जाण्यासाठी खालील यादीतून आपला *प्रभाग* निवडा 👇`,
 
 		NagarsevakPrompt: `🏅 *आपला नगरसेवक निवडा*
 
@@ -172,33 +155,23 @@ _उदाहरण: ४०११०७, ४०१३०३_`,
 	},
 
 	"hi": {
-		PinPrompt: `✅ बढ़िया! आपने *हिंदी* चुनी.
+		PinPrompt: `यह नागरिक सहायता और सेवाओं के लिए *अटलजनसेवा नागरिक सेवा* की अधिकृत ऑटोमेटिक रिप्लाय चैटबॉट सेवा है.
 
-──────────────────────
-🔍 *अपना नगरसेवक खोजें*
-──────────────────────
-अपने क्षेत्र के नागरिक प्रतिनिधि खोजने के लिए कृपया अपना *६-अंकीय पिन कोड* दर्ज करें:
+अपने संबंधित नगरसेवक को खोजने के लिए, कृपया ६ अंकों का पिन कोड और अपना प्रभाग क्रमांक दर्ज करें.
 
-_उदाहरण: ४०११०७, ४०१३०३_`,
+📍 *पिन कोड, प्रभाग क्रमांक*
+उदाहरण: *400601, TES1*`,
 
-		InvalidPin: `⚠️ *पिन कोड नहीं मिला*
+		InvalidPin: `⚠️ आपके द्वारा दर्ज किया गया पिन कोड और प्रभाग क्रमांक *%s* गलत है या उपलब्ध नहीं है.
 
-आपका दर्ज किया गया पिन कोड हमारे रिकॉर्ड में उपलब्ध नहीं है.
+कृपया आगे बढ़ने के लिए सही *६ अंकों का पिन कोड* और *प्रभाग क्रमांक* पुनः दर्ज करें.
 
-कृपया इन मान्य डेमो पिन का उपयोग करें:
-  📍 *४०११०७* — ठाणे
-  📍 *४०१३०३* — पालघर
+📍 *पिन कोड, प्रभाग क्रमांक*
+उदाहरण: *400601, TES1*`,
 
-कृपया फिर से *6 अंकों का पिन कोड* दर्ज करें:`,
+		WardPrompt: `✅ आपने पिन कोड और प्रभाग क्रमांक *%s और %s* सफलतापूर्वक दर्ज किया है.
 
-		WardPrompt: `📍 *आपका स्थान मिल गया!*
-
-┌─────────────────────┐
-  🏛  *राज्य:*    %s
-  🏙  *जिल्ला:*   %s
-└─────────────────────┘
-
-आपका क्षेत्र मिल गया. आगे बढ़ने के लिए नीचे सूची से अपना *वार्ड* चुनें 👇`,
+कृपया नीचे दी गई सूची में से अपने नगरसेवक का चयन करें 👇`,
 
 		NagarsevakPrompt: `🏅 *अपना नगरसेवक चुनें*
 
