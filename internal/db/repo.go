@@ -76,8 +76,8 @@ func (r *Repo) Close() error { return r.db.Close() }
 func (r *Repo) LocationByPincode(ctx context.Context, pincode string) (*LocationInfo, error) {
 	row := r.db.QueryRowContext(ctx, `
 		SELECT state, district,
-		       state_hindi,
-		       district_hindi
+		       COALESCE(state_hindi, ''),
+		       COALESCE(district_hindi, '')
 		FROM   political_users
 		WHERE  pincode::text = $1
 		  AND  is_active = true
@@ -85,22 +85,15 @@ func (r *Repo) LocationByPincode(ctx context.Context, pincode string) (*Location
 	`, pincode)
 
 	var loc LocationInfo
-	var stateHindi, districtHindi sql.NullString
-	if err := row.Scan(&loc.State, &loc.District, &stateHindi, &districtHindi); err != nil {
+	if err := row.Scan(&loc.State, &loc.District, &loc.StateHindi, &loc.DistrictHindi); err != nil {
 		return nil, err
-	}
-	if stateHindi.Valid {
-		loc.StateHindi = stateHindi.String
-	}
-	if districtHindi.Valid {
-		loc.DistrictHindi = districtHindi.String
 	}
 	return &loc, nil
 }
 
 func (r *Repo) WardsByPincode(ctx context.Context, pincode string) ([]Ward, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT DISTINCT ward, ward_hindi
+		SELECT DISTINCT ward, COALESCE(ward_hindi, '')
 		FROM   political_users
 		WHERE  pincode::text = $1
 		  AND  ward IS NOT NULL
@@ -116,12 +109,8 @@ func (r *Repo) WardsByPincode(ctx context.Context, pincode string) ([]Ward, erro
 	var wards []Ward
 	for rows.Next() {
 		var w Ward
-		var wardHindi sql.NullString
-		if err := rows.Scan(&w.Code, &wardHindi); err != nil {
+		if err := rows.Scan(&w.Code, &w.CodeHindi); err != nil {
 			return nil, err
-		}
-		if wardHindi.Valid {
-			w.CodeHindi = wardHindi.String
 		}
 		wards = append(wards, w)
 	}
@@ -216,8 +205,8 @@ func (r *Repo) NagarsevakByID(ctx context.Context, id string) (*Nagarsevak, erro
 func (r *Repo) LocationByPincodeHindi(ctx context.Context, pincode string) (*LocationInfo, error) {
 	row := r.db.QueryRowContext(ctx, `
 		SELECT state, district,
-		       state_hindi,
-		       district_hindi
+		       COALESCE(state_hindi, ''),
+		       COALESCE(district_hindi, '')
 		FROM   political_users
 		WHERE  pincode_hindi::text = $1
 		  AND  is_active = true
@@ -225,22 +214,15 @@ func (r *Repo) LocationByPincodeHindi(ctx context.Context, pincode string) (*Loc
 	`, pincode)
 
 	var loc LocationInfo
-	var stateHindi, districtHindi sql.NullString
-	if err := row.Scan(&loc.State, &loc.District, &stateHindi, &districtHindi); err != nil {
+	if err := row.Scan(&loc.State, &loc.District, &loc.StateHindi, &loc.DistrictHindi); err != nil {
 		return nil, err
-	}
-	if stateHindi.Valid {
-		loc.StateHindi = stateHindi.String
-	}
-	if districtHindi.Valid {
-		loc.DistrictHindi = districtHindi.String
 	}
 	return &loc, nil
 }
 
 func (r *Repo) WardsByPincodeHindi(ctx context.Context, pincode string) ([]Ward, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT DISTINCT ward, ward_hindi
+		SELECT DISTINCT ward, COALESCE(ward_hindi, '')
 		FROM   political_users
 		WHERE  pincode_hindi::text = $1
 		  AND  ward IS NOT NULL
@@ -256,12 +238,8 @@ func (r *Repo) WardsByPincodeHindi(ctx context.Context, pincode string) ([]Ward,
 	var wards []Ward
 	for rows.Next() {
 		var w Ward
-		var wardHindi sql.NullString
-		if err := rows.Scan(&w.Code, &wardHindi); err != nil {
+		if err := rows.Scan(&w.Code, &w.CodeHindi); err != nil {
 			return nil, err
-		}
-		if wardHindi.Valid {
-			w.CodeHindi = wardHindi.String
 		}
 		wards = append(wards, w)
 	}
