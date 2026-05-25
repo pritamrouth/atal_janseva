@@ -88,6 +88,8 @@ func (h *Handler) HandleRaw(msg whatsapp.Message) {
 				log.Error("save session", "err", err)
 				return
 			}
+			// Send PIN prompt after language selection
+			_ = h.wa.SendText(ctx, phone, h.t(sess).PinPrompt)
 		} else {
 			h.sendLanguagePicker(ctx, phone, phone)
 		}
@@ -152,23 +154,66 @@ func (h *Handler) handlePin(ctx context.Context, phone string, sess *store.Sessi
 		return
 	}
 
-	// Lookup location
+	// Fetch location and wards in parallel
 	var loc *db.LocationInfo
-	var err error
-	if sess.Lang == "mr" || sess.Lang == "hi" {
-		loc, err = h.repo.LocationByPincodeHindi(ctx, pin)
+	var wards []db.Ward
+	var locErr, wardsErr error
+
+	// Use goroutines to fetch location and wards concurrently
+	locChan := make(chan *db.LocationInfo, 1)
+	locErrChan := make(chan error, 1)
+	wardsChan := make(chan []db.Ward, 1)
+	wardsErrChan := make(chan error, 1)
+
+	isHindi := sess.Lang == "mr" || sess.Lang == "hi"
+
+	// Fetch location
+	go func() {
+		if isHindi {
+			l, err := h.repo.LocationByPincodeHindi(ctx, pin)
+			locChan <- l
+			locErrChan <- err
+		} else {
+			l, err := h.repo.LocationByPincode(ctx, asciiPin)
+			locChan <- l
+			locErrChan <- err
+		}
+	}()
+
+	// Fetch wards
+	go func() {
+		if isHindi {
+			w, err := h.repo.WardsByPincodeHindi(ctx, pin)
+			wardsChan <- w
+			wardsErrChan <- err
+		} else {
+			w, err := h.repo.WardsByPincode(ctx, asciiPin)
+			wardsChan <- w
+			wardsErrChan <- err
+		}
+	}()
+
+	// Wait for both to complete
+	loc = <-locChan
+	locErr = <-locErrChan
+	wards = <-wardsChan
+	wardsErr = <-wardsErrChan
+
+	// Set pincode based on language
+	if isHindi {
 		sess.Pincode = pin
 	} else {
-		loc, err = h.repo.LocationByPincode(ctx, asciiPin)
 		sess.Pincode = asciiPin
 	}
-	if err == sql.ErrNoRows {
+
+	// Handle location errors
+	if locErr == sql.ErrNoRows {
 		_ = h.wa.SendText(ctx, phone, fmt.Sprintf(h.t(sess).InvalidPin, pin))
 		return
 	}
 
-	if err != nil {
-		slog.Error("LocationByPincode", "pin", pin, "lang", sess.Lang, "err", err)
+	if locErr != nil {
+		slog.Error("LocationByPincode", "pin", pin, "lang", sess.Lang, "err", locErr)
 		_ = h.wa.SendText(ctx, phone, "⚠️ Database error, please try again shortly.")
 		return
 	}
@@ -178,15 +223,9 @@ func (h *Handler) handlePin(ctx context.Context, phone string, sess *store.Sessi
 	sess.StateHindi    = loc.StateHindi
 	sess.DistrictHindi = loc.DistrictHindi
 
-	// Load wards to validate hint or show options
-	var wards []db.Ward
-	if sess.Lang == "mr" || sess.Lang == "hi" {
-		wards, err = h.repo.WardsByPincodeHindi(ctx, sess.Pincode)
-	} else {
-		wards, err = h.repo.WardsByPincode(ctx, sess.Pincode)
-	}
-	if err != nil || len(wards) == 0 {
-		slog.Error("WardsByPincode in handlePin", "pin", sess.Pincode, "err", err)
+	// Handle wards errors
+	if wardsErr != nil || len(wards) == 0 {
+		slog.Error("WardsByPincode in handlePin", "pin", sess.Pincode, "err", wardsErr)
 		_ = h.wa.SendText(ctx, phone, "⚠️ Could not load ward data. Please try again.")
 		return
 	}
