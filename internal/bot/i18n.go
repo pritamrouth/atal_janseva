@@ -31,19 +31,17 @@ func GreetingFor(lang, phone string) string {
 	switch lang {
 	case "mr":
 		return fmt.Sprintf(`👋 नमस्कार *%s*
-अटलजनसेवा नागरिक सेवेशी जोडल्याबद्दल धन्यवाद.
-
-आपल्या सोयीसाठी, कृपया आपली पसंतीची भाषा निवडा:`, formatted)
+कृपया आपली पसंतीची भाषा निवडा:`, formatted)
 	case "hi":
 		return fmt.Sprintf(`👋 नमस्ते *%s*
-अटलजनसेवा नागरिक सेवा से जुड़ने के लिए धन्यवाद.
-
-बेहतर अनुभव के लिए, कृपया अपनी पसंदीदा भाषा चुनें:`, formatted)
+कृपया अपनी पसंदीदा भाषा चुनें:`, formatted)
 	default: // "en"
 		return fmt.Sprintf(`👋 Hi *%s*
-Thank you for connecting with *Ataljanseva Citizen Service*.
+Please select your preferred language from below 👇!!!! 
 
-For a better experience, please select your preferred language:`, formatted)
+कृपया तुमची पसंतीची भाषा निवडा 👇!!!! 
+
+कृपया नीचे से अपनी पसंदीदा भाषा चुनें 👇!!!!`, formatted)
 	}
 }
 
@@ -75,17 +73,16 @@ var I18n = map[string]Strings{
 ──────────────────────
 Please enter your *6-digit PIN code* to locate the civic representatives in your area:
 
-_Example: 411001, 400001, 440001, 421301_`,
+_Example: 401107, 401303_`,
 
 		InvalidPin: `⚠️ *PIN Code Not Found*
 
 The PIN code you entered doesn't match any records in our database.
 
 Please try one of these valid demo PINs:
-  📍 *411001* — Pune
-  📍 *400001* — Mumbai City
-  📍 *440001* — Nagpur
-  📍 *421301* — Thane
+  📍 *401107* — Mumbai City
+  📍 *401303* — Nagpur
+
 
 Please type your *6-digit PIN code* again:`,
 
@@ -103,25 +100,23 @@ Your area has been found. Please select your *Ward* from the list below to conti
 Here are the elected representatives for your ward.
 Tap a name to connect with your Nagarsevak 👇`,
 
-		Welcome: `🎉 *Connection Successful!*
+		Welcome: `Thank you for staying connected with the Ataljanseva Citizen
+Service.
 
-Your Nagarsevak has been linked to your account.
+You can:
+- View work reports, events & meetings, and active programs
+through the Ataljanseva Citizen Portal.
 
-━━━━━━━━━━━━━━━━━━━━━
-*Ataljanseva Citizen Service*
-Your bridge to local governance
-━━━━━━━━━━━━━━━━━━━━━
-
-🌐 _ataljanseva.in_
+🌐 For more information, please visit: _ataljanseva.in_
 
 How can we help you today? 👇`,
 
-		LabelSOS:      "🆘 SOS Emergency",
-		LabelRegister: "📝 File Complaint",
-		LabelTrack:    "🔍 Track Complaint",
-		LabelEnglish:  "🇮🇳 English",
-		LabelMarathi:  "🇮🇳 मराठी",
-		LabelHindi:    "🇮🇳 हिंदी",
+		LabelSOS:      "",
+		LabelRegister: "",
+		LabelTrack:    "",
+		LabelEnglish:  "English",
+		LabelMarathi:  "मराठी",
+		LabelHindi:    "हिंदी",
 	},
 
 	"mr": {
@@ -158,25 +153,22 @@ _उदाहरण: ४०११०७, ४०१३०३_`,
 आपल्या प्रभागातील निवडून आलेल्या प्रतिनिधींची यादी खाली आहे.
 आपल्या नगरसेवकाशी जोडण्यासाठी नाव निवडा 👇`,
 
-		Welcome: `🎉 *यशस्वीरीत्या जोडले गेले!*
+		Welcome: `अटलजनसेवा नागरि क सेवेशी जोडलेलेराहि ल्याबद्दल धन्यवाद।
 
-आपला नगरसेवक आपल्या खात्याशी जोडला गेला आहे.
+*आपण येथे:*
+-  अटलजनसेवा नागरि क पोर्टलद्वारेकामाचा अहवाल, कार्यक्रर्य म व बठै कांची माहि ती
+तसेच सक्रि य योजनांची माहि ती पाहू शकता
 
-━━━━━━━━━━━━━━━━━━━━━━
-*अटलजनसेवा नागरिक सेवा*
-स्थानिक प्रशासनाशी आपला सेतू
-━━━━━━━━━━━━━━━━━━━━━━
+🌐 अधि क माहि तीसाठी कृ पया भेट द्या: _ataljanseva.in_
 
-🌐 _ataljanseva.in_
+कृपया खालील पर्या यांपकै ी एक नि वडा 👇`,
 
-आज आपण काय करू इच्छिता? 👇`,
-
-		LabelSOS:      "🆘 SOS आपत्कालीन",
-		LabelRegister: "📝 तक्रार नोंदवा",
-		LabelTrack:    "🔍 तक्रार ट्रॅक करा",
-		LabelEnglish:  "🇮🇳 English",
-		LabelMarathi:  "🇮🇳 मराठी",
-		LabelHindi:    "🇮🇳 हिंदी",
+		LabelSOS:      "",
+		LabelRegister: "",
+		LabelTrack:    "",
+		LabelEnglish:  "English",
+		LabelMarathi:  "मराठी",
+		LabelHindi:    "हिंदी",
 	},
 
 	"hi": {
@@ -213,24 +205,22 @@ _उदाहरण: ४०११०७, ४०१३०३_`,
 आपके वार्ड के निर्वाचित प्रतिनिधियों की सूची नीचे दी गई है.
 अपने नगरसेवक से जुड़ने के लिए नाम चुनें 👇`,
 
-		Welcome: `🎉 *सफलतापूर्वक जुड़ गए!*
+		Welcome: `अटलजनसेवा नागरि क सेवा सेजड़ु
+ेरहनेके लि ए धन्यवाद।
 
-आपका नगरसेवक आपके खाते से जोड़ दिया गया है.
+*आप यहाँ:*
+-अटलजनसेवा नागरि क पोर्टल के माध्यम सेकार्य रि पोर्ट, कार्यक्रर्य म एवं बठै कों तथा
+सक्रि य योजनाओं की जानकारी देख सकते है
 
-━━━━━━━━━━━━━━━━━━━━━━
-*अटलजनसेवा नागरिक सेवा*
-स्थानीय प्रशासन से आपका सेतु
-━━━━━━━━━━━━━━━━━━━━━━
-
-🌐 _ataljanseva.in_
+🌐 अधिक जानकारी के लिए कृपया विजिट करें: _ataljanseva.in_
 
 आज आप क्या करना चाहते हैं? 👇`,
 
-		LabelSOS:      "🆘 SOS आपातकालीन",
-		LabelRegister: "📝 शिकायत दर्ज करें",
-		LabelTrack:    "🔍 शिकायत ट्रैक करें",
-		LabelEnglish:  "🇮🇳 English",
-		LabelMarathi:  "🇮🇳 मराठी",
-		LabelHindi:    "🇮🇳 हिंदी",
+		LabelSOS:      "",
+		LabelRegister: "",
+		LabelTrack:    "",
+		LabelEnglish:  "English",
+		LabelMarathi:  "मराठी",
+		LabelHindi:    "हिंदी",
 	},
 }

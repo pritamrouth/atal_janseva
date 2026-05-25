@@ -69,27 +69,10 @@ func (h *Handler) HandleRaw(msg whatsapp.Message) {
 	switch sess.Step {
 
 	case store.StepStart:
-		if msg.Type == "interactive" && msg.Interactive != nil {
-			id := buttonID(msg.Interactive)
-			switch id {
-			case "lang_en":
-				sess.Lang = "en"
-			case "lang_mr":
-				sess.Lang = "mr"
-			case "lang_hi":
-				sess.Lang = "hi"
-			default:
-				h.sendLanguagePicker(ctx, phone, phone)
-				return
-			}
-			sess.Step = store.StepLangChosen
-			if err := h.store.Save(ctx, sess); err != nil {
-				log.Error("save session", "err", err)
-				return
-			}
-			_ = h.wa.SendText(ctx, phone, h.t(sess).PinPrompt)
+		if msg.Type == "text" {
+			h.handlePin(ctx, phone, sess, strings.TrimSpace(msg.Text.Body))
 		} else {
-			h.sendLanguagePicker(ctx, phone, phone)
+			_ = h.wa.SendText(ctx, phone, h.t(sess).PinPrompt)
 		}
 
 	case store.StepLangChosen:
@@ -143,28 +126,27 @@ func (h *Handler) sendLanguagePicker(ctx context.Context, phone, rawPhone string
 // Step 1 – PIN → DB
 // ─────────────────────────────────────────────
 
-func (h *Handler) handlePin(ctx context.Context, phone string, sess *store.Session, pin string) {
-	pin = strings.TrimSpace(pin)
+func (h *Handler) handlePin(ctx context.Context, phone string, sess *store.Session, raw string) {
+	pin, wardHint := parseUserInput(raw)
 
-	// Normalize to ASCII only for length validation
+	// Normalize pin digits (Devanagari → ASCII for length check)
 	asciiPin := normalizePin(pin)
+
 	if len([]rune(asciiPin)) != 6 {
 		_ = h.wa.SendText(ctx, phone, h.t(sess).InvalidPin)
 		return
 	}
 
+	// Lookup location
 	var loc *db.LocationInfo
 	var err error
 	if sess.Lang == "mr" || sess.Lang == "hi" {
-		// Query pincode_hindi column using the original Devanagari input
 		loc, err = h.repo.LocationByPincodeHindi(ctx, pin)
-		// Store the ASCII version in session for downstream ward/nagarsevak queries
-		sess.Pincode = pin // keep Devanagari — all Hindi queries use pincode_hindi
+		sess.Pincode = pin
 	} else {
 		loc, err = h.repo.LocationByPincode(ctx, asciiPin)
 		sess.Pincode = asciiPin
 	}
-
 	if err == sql.ErrNoRows {
 		_ = h.wa.SendText(ctx, phone, h.t(sess).InvalidPin)
 		return
@@ -175,18 +157,85 @@ func (h *Handler) handlePin(ctx context.Context, phone string, sess *store.Sessi
 		return
 	}
 
-	sess.State = loc.State
-	sess.District = loc.District
-
+	sess.State         = loc.State
+	sess.District      = loc.District
 	sess.StateHindi    = loc.StateHindi
 	sess.DistrictHindi = loc.DistrictHindi
 
-	sess.Step = store.StepWardChosen
-	if err := h.store.Save(ctx, sess); err != nil {
-		slog.Error("save session", "phone", phone, "err", err)
+	// Load wards
+	var wards []db.Ward
+	if sess.Lang == "mr" || sess.Lang == "hi" {
+		wards, err = h.repo.WardsByPincodeHindi(ctx, sess.Pincode)
+	} else {
+		wards, err = h.repo.WardsByPincode(ctx, sess.Pincode)
+	}
+	if err != nil || len(wards) == 0 {
+		slog.Error("WardsByPincode in handlePin", "pin", sess.Pincode, "err", err)
+		_ = h.wa.SendText(ctx, phone, "⚠️ Could not load ward data. Please try again.")
 		return
 	}
-	h.promptWard(ctx, phone, sess)
+
+	// Try to match ward hint if provided
+	if wardHint != "" {
+		matched := ""
+		for _, w := range wards {
+			if wardMatchesHint(w.Code, wardHint) || wardMatchesHint(w.CodeHindi, wardHint) {
+				matched = w.Code
+				break
+			}
+		}
+		if matched != "" {
+			// Ward hint matched — skip ward picker
+			sess.Ward = matched
+			sess.Step = store.StepNagarsevak
+			if err := h.store.Save(ctx, sess); err != nil {
+				slog.Error("save session", "phone", phone, "err", err)
+				return
+			}
+			h.promptNagarsevak(ctx, phone, sess)
+			return
+		}
+		// Ward hint provided but didn't match — tell them and show valid wards
+		h.sendInvalidWardHint(ctx, phone, sess, wardHint, wards)
+		return
+	}
+
+	// No ward hint — auto-select if only one ward, else show picker
+	if len(wards) == 1 {
+		sess.Ward = wards[0].Code
+		sess.Step = store.StepNagarsevak
+		if err := h.store.Save(ctx, sess); err != nil {
+			slog.Error("save session", "phone", phone, "err", err)
+			return
+		}
+		h.promptNagarsevak(ctx, phone, sess)
+	} else {
+		sess.Step = store.StepWardChosen
+		if err := h.store.Save(ctx, sess); err != nil {
+			slog.Error("save session", "phone", phone, "err", err)
+			return
+		}
+		h.promptWard(ctx, phone, sess)
+	}
+}
+
+// sendInvalidWardHint tells the user their ward hint didn't match and shows
+// valid ward codes so they can retry with the correct format.
+func (h *Handler) sendInvalidWardHint(ctx context.Context, phone string, sess *store.Session, hint string, wards []db.Ward) {
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("⚠️ *Ward \"%s\" not found.*\n\n", hint))
+	sb.WriteString("Valid format:\n")
+	sb.WriteString(fmt.Sprintf("  • *%s* — PIN only\n\n", sess.Pincode))
+	sb.WriteString("Or PIN with exact ward code:\n")
+	for _, w := range wards {
+		label := w.Code
+		if (sess.Lang == "mr" || sess.Lang == "hi") && w.CodeHindi != "" {
+			label = w.CodeHindi
+		}
+		sb.WriteString(fmt.Sprintf("  • *%s, %s*\n", sess.Pincode, label))
+	}
+	sb.WriteString("\nPlease type again 👇")
+	_ = h.wa.SendText(ctx, phone, sb.String())
 }
 
 // ─────────────────────────────────────────────
@@ -435,3 +484,25 @@ func normalizePin(s string) string {
 	}
 	return b.String()
 }
+
+// parseUserInput splits on comma only.
+// "400601"        → pin="400601", wardHint=""
+// "400601, TES1"  → pin="400601", wardHint="TES1"
+// "400601,TES1"   → pin="400601", wardHint="TES1"
+func parseUserInput(raw string) (pin string, wardHint string) {
+	parts := strings.SplitN(raw, ",", 2)
+	pin = strings.TrimSpace(parts[0])
+	if len(parts) == 2 {
+		wardHint = strings.TrimSpace(parts[1])
+	}
+	return
+}
+
+// wardMatchesHint does exact case-insensitive match only.
+func wardMatchesHint(wardCode, hint string) bool {
+	if hint == "" {
+		return false
+	}
+	return strings.EqualFold(wardCode, hint)
+}
+
