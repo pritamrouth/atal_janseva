@@ -466,7 +466,8 @@ func (h *Handler) sendMainMenu(ctx context.Context, phone string, sess *store.Se
 		{Title: t.LabelRegister, URL: nagarsevakURL(sess.NagarsevakSlug, "grievance")},
 		{Title: t.LabelTrack,    URL: nagarsevakURL(sess.NagarsevakSlug, "track-issue")},
 	}
-	if err := h.wa.SendCTAButtons(ctx, phone, t.LabelSOS, "", "", ctaButtons); err != nil {
+	bodyText := "Choose an option to proceed 👇"
+	if err := h.wa.SendCTAButtons(ctx, phone, bodyText, "", "", ctaButtons); err != nil {
 		slog.Error("sendMainMenu SendCTAButtons", "phone", phone, "err", err)
 	}
 }
@@ -526,12 +527,19 @@ func normalizePin(s string) string {
 	return b.String()
 }
 
-// parseUserInput splits on comma only.
+// parseUserInput splits on comma or space.
 // "400601"        → pin="400601", wardHint=""
 // "400601, TES1"  → pin="400601", wardHint="TES1"
 // "400601,TES1"   → pin="400601", wardHint="TES1"
+// "400601 TES1"   → pin="400601", wardHint="TES1"
 func parseUserInput(raw string) (pin string, wardHint string) {
-	parts := strings.SplitN(raw, ",", 2)
+	// Try comma first, then fall back to space
+	var parts []string
+	if strings.Contains(raw, ",") {
+		parts = strings.SplitN(raw, ",", 2)
+	} else {
+		parts = strings.SplitN(raw, " ", 2)
+	}
 	pin = strings.TrimSpace(parts[0])
 	if len(parts) == 2 {
 		wardHint = strings.TrimSpace(parts[1])
