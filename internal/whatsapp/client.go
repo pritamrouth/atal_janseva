@@ -237,7 +237,7 @@ func (c *Client) SendCTAButtons(ctx context.Context, to, bodyText, header, foote
         msgHeader := header
         msgFooter := footer
         if i > 0 {
-            msgBody  = "\u200B"  // non-empty, satisfies Meta's requirement
+            msgBody  = bodyText  // non-empty, satisfies Meta's requirement
             msgHeader = ""
             msgFooter = ""
         }

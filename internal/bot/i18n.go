@@ -10,6 +10,7 @@ type Strings struct {
 	WardPrompt       string
 	NagarsevakPrompt string
 	Welcome          string
+	MainMenuHeader   string
 
 	// Main-menu button labels
 	LabelSOS      string
@@ -101,9 +102,13 @@ through the Ataljanseva Citizen Portal.
 
 How can we help you today? 👇`,
 
-		LabelSOS:      "SOS Emergency Complaint",
-		LabelRegister: "Register Complaint",
-		LabelTrack:    "Track Your Complaint",
+		MainMenuHeader: `* Register complaints
+* Raise Emergency SOS requests
+* Track complaint status`,
+
+		LabelSOS:      "🆘 SOS Emergency Complaint",
+		LabelRegister: "📝 Register Complaint",
+		LabelTrack:    "🔍 Track Your Complaint",
 		LabelEnglish:  "English",
 		LabelMarathi:  "मराठी",
 		LabelHindi:    "हिंदी",
@@ -142,9 +147,13 @@ How can we help you today? 👇`,
 
 कृपया खालील पर्या यांपकै ी एक नि वडा 👇`,
 
-		LabelSOS:      "SOS आपत्कालीि तक्रार",
-		LabelRegister: "तक्रार िोंदव",
-		LabelTrack:    "आपली तक्रार टरॅक करा",
+		MainMenuHeader: `* तक्रार नोंदवू शकता
+* आपत्कालीन SOS मदत विनतंी करू शकता
+* आपल्या तक्रारीची स्थिती ट्रॅक करू शकता`,
+
+		LabelSOS:      "🆘 SOS आपत्कालीि तक्रार",
+		LabelRegister: "📝 तक्रार नोंदवा",
+		LabelTrack:    "🔍 आपली तक्रार टरॅक करा",
 		LabelEnglish:  "English",
 		LabelMarathi:  "मराठी",
 		LabelHindi:    "हिंदी",
@@ -183,9 +192,13 @@ How can we help you today? 👇`,
 
 आज आप क्या करना चाहते हैं? 👇`,
 
-		LabelSOS:      "SOS आपातकालीि नशकायत",
-		LabelRegister: "नशकायत दजवकर",
-		LabelTrack:    "अपिी नशकायत टरैक कर",
+		MainMenuHeader: `* शिकायत दर्ज कर सकतेहैं
+* आपातकालीन SOS सहायता अनुरोध भेज सकतेहैं
+* अपनी शिकायत की स्थिति ट्रैक कर सकतेहैं`,
+
+		LabelSOS:      "🆘 SOS आपातकालीि नशकायत",
+		LabelRegister: "📝 नशकायत दजवकर",
+		LabelTrack:    "🔍 अपिी नशकायत टरैक कर",
 		LabelEnglish:  "English",
 		LabelMarathi:  "मराठी",
 		LabelHindi:    "हिंदी",
