@@ -154,6 +154,13 @@ func (h *Handler) handlePin(ctx context.Context, phone string, sess *store.Sessi
 		return
 	}
 
+	// Ward is now mandatory — must be provided with pincode in one message
+	if wardHint == "" {
+		msg := fmt.Sprintf("Please send *pincode and ward* together.\n\nExample: `%s,A`", asciiPin)
+		_ = h.wa.SendText(ctx, phone, msg)
+		return
+	}
+
 	// Fetch location and wards in parallel
 	var loc *db.LocationInfo
 	var wards []db.Ward
@@ -230,13 +237,7 @@ func (h *Handler) handlePin(ctx context.Context, phone string, sess *store.Sessi
 		return
 	}
 
-	// No ward hint — PIN alone is no longer accepted, show required format
-	if wardHint == "" {
-		h.sendWardRequired(ctx, phone, sess, wards)
-		return
-	}
-
-	// Exact match ward hint
+	// Match ward from user input
 	matched := ""
 	for _, w := range wards {
 		if wardMatchesHint(w.Code, wardHint) || wardMatchesHint(w.CodeHindi, wardHint) {
@@ -249,7 +250,7 @@ func (h *Handler) handlePin(ctx context.Context, phone string, sess *store.Sessi
 		return
 	}
 
-	// Valid PIN + ward — proceed
+	// Valid PIN + ward — proceed directly to nagarsevak selection
 	sess.Ward = matched
 	sess.Step = store.StepNagarsevak
 	if err := h.store.Save(ctx, sess); err != nil {
