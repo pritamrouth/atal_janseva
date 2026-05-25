@@ -67,9 +67,7 @@ func formatPhone(raw string) string {
 var I18n = map[string]Strings{
 	"en": {
 		PinPrompt: `This is the *Ataljanseva Citizen Service* Automatic Reply Chatbot for citizen support and assistance.
-
 To continue further, please search for your respective Corporator.
-
 Please enter your *6-digit PIN Code* and *Ward Number* in the following format:
 
 📍 *PIN Code, Ward Number*
@@ -80,7 +78,7 @@ Example: *400601,21D*`,
 Please re-enter the correct *6-digit PIN Code* and *Ward Number* to continue.
 
 📍 *PIN Code, Ward Number*
-Example: *400601, TES1*`,
+Example: *400601,21D*`,
 
 		WardPrompt: `✅ You entered PIN Code and Ward Number *%s and %s* successfully.
 
@@ -103,9 +101,9 @@ through the Ataljanseva Citizen Portal.
 
 How can we help you today? 👇`,
 
-		LabelSOS:      "🚨 SOS",
-		LabelRegister: "📝 Register",
-		LabelTrack:    "📍 Track",
+		LabelSOS:      "SOS Emergency Complaint",
+		LabelRegister: "Register Complaint",
+		LabelTrack:    "Track Your Complaint",
 		LabelEnglish:  "English",
 		LabelMarathi:  "मराठी",
 		LabelHindi:    "हिंदी",
@@ -113,18 +111,16 @@ How can we help you today? 👇`,
 
 	"mr": {
 		PinPrompt: `ही नागरिक सहायता व सेवांसाठी *अटलजनसेवा नागरिक सेवेची* अधिकृत ऑटोमॅटिक रिप्लाय चॅटबॉट सेवा आहे.
-
 आपल्या संबंधित नगरसेवकाचा शोध घेण्यासाठी, कृपया ६ अंकी पिन कोड आणि आपला प्रभाग क्रमांक प्रविष्ट करा.
-
 📍 *पिन कोड, प्रभाग क्रमांक*
-उदाहरण: *400601, TES1*`,
+उदाहरण: *४००६०१,२१डी*`,
 
 		InvalidPin: `⚠️ प्रविष्ट केलेला पिन कोड आणि प्रभाग क्रमांक *%s* आमच्या नोंदींशी जुळत नाही किंवा सापडला नाही.
 
 कृपया पुढे जाण्यासाठी योग्य *६ अंकी पिन कोड* आणि *प्रभाग क्रमांक* पुन्हा प्रविष्ट करा.
 
 📍 *पिन कोड, प्रभाग क्रमांक*
-उदाहरण: *400601, TES1*`,
+उदाहरण: *४००६०१,२१डी*`,
 
 		WardPrompt: `✅ आपण पिन कोड आणि प्रभाग क्रमांक *%s आणि %s* यशस्वीरित्या प्रविष्ट केले आहेत.
 
@@ -146,9 +142,9 @@ How can we help you today? 👇`,
 
 कृपया खालील पर्या यांपकै ी एक नि वडा 👇`,
 
-		LabelSOS:      "🚨 एसओएस",
-		LabelRegister: "📝 तक्रार दाखल करा",
-		LabelTrack:    "📍 ट्रॅक करा",
+		LabelSOS:      "SOS आपत्कालीि तक्रार",
+		LabelRegister: "तक्रार िोंदव",
+		LabelTrack:    "आपली तक्रार टरॅक करा",
 		LabelEnglish:  "English",
 		LabelMarathi:  "मराठी",
 		LabelHindi:    "हिंदी",
@@ -156,18 +152,16 @@ How can we help you today? 👇`,
 
 	"hi": {
 		PinPrompt: `यह नागरिक सहायता और सेवाओं के लिए *अटलजनसेवा नागरिक सेवा* की अधिकृत ऑटोमेटिक रिप्लाय चैटबॉट सेवा है.
-
 अपने संबंधित नगरसेवक को खोजने के लिए, कृपया ६ अंकों का पिन कोड और अपना प्रभाग क्रमांक दर्ज करें.
-
 📍 *पिन कोड, प्रभाग क्रमांक*
-उदाहरण: *400601, TES1*`,
+उदाहरण: *४००६०१,२१डी*`,
 
 		InvalidPin: `⚠️ आपके द्वारा दर्ज किया गया पिन कोड और प्रभाग क्रमांक *%s* गलत है या उपलब्ध नहीं है.
 
 कृपया आगे बढ़ने के लिए सही *६ अंकों का पिन कोड* और *प्रभाग क्रमांक* पुनः दर्ज करें.
 
 📍 *पिन कोड, प्रभाग क्रमांक*
-उदाहरण: *400601, TES1*`,
+उदाहरण: *४००६०१,२१डी*`,
 
 		WardPrompt: `✅ आपने पिन कोड और प्रभाग क्रमांक *%s और %s* सफलतापूर्वक दर्ज किया है.
 
@@ -189,9 +183,9 @@ How can we help you today? 👇`,
 
 आज आप क्या करना चाहते हैं? 👇`,
 
-		LabelSOS:      "🚨 एसओएस",
-		LabelRegister: "📝 तकरार दर्ज करें",
-		LabelTrack:    "📍 ट्रैक करें",
+		LabelSOS:      "SOS आपातकालीि नशकायत",
+		LabelRegister: "नशकायत दजवकर",
+		LabelTrack:    "अपिी नशकायत टरैक कर",
 		LabelEnglish:  "English",
 		LabelMarathi:  "मराठी",
 		LabelHindi:    "हिंदी",
