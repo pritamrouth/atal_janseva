@@ -88,8 +88,8 @@ func (h *Handler) HandleRaw(msg whatsapp.Message) {
 				log.Error("save session", "err", err)
 				return
 			}
-			// Send PIN prompt after language selection
-			_ = h.wa.SendText(ctx, phone, h.t(sess).PinPrompt)
+			// Send PIN prompt with image after language selection
+			h.sendPinPromptWithImage(ctx, phone, sess)
 		} else {
 			h.sendLanguagePicker(ctx, phone, phone)
 		}
@@ -138,6 +138,15 @@ func (h *Handler) sendLanguagePicker(ctx context.Context, phone, rawPhone string
 		{"lang_hi", "हिंदी"},
 	}); err != nil {
 		slog.Error("sendLanguagePicker", "phone", phone, "err", err)
+	}
+}
+
+// sendPinPromptWithImage sends the PIN prompt with an image header
+func (h *Handler) sendPinPromptWithImage(ctx context.Context, phone string, sess *store.Session) {
+	if err := h.wa.SendImage(ctx, phone, ataljansevaLogoURL, h.t(sess).PinPrompt); err != nil {
+		slog.Error("sendPinPromptWithImage", "phone", phone, "err", err)
+		// Fallback to text if image fails
+		_ = h.wa.SendText(ctx, phone, h.t(sess).PinPrompt)
 	}
 }
 
@@ -239,9 +248,11 @@ func (h *Handler) handlePin(ctx context.Context, phone string, sess *store.Sessi
 
 	// Match ward from user input
 	matched := ""
+	matchedHindi := ""
 	for _, w := range wards {
 		if wardMatchesHint(w.Code, wardHint) || wardMatchesHint(w.CodeHindi, wardHint) {
 			matched = w.Code
+			matchedHindi = w.CodeHindi
 			break
 		}
 	}
@@ -252,6 +263,7 @@ func (h *Handler) handlePin(ctx context.Context, phone string, sess *store.Sessi
 
 	// Valid PIN + ward — proceed directly to nagarsevak selection
 	sess.Ward = matched
+	sess.WardHindi = matchedHindi
 	sess.Step = store.StepNagarsevak
 	if err := h.store.Save(ctx, sess); err != nil {
 		slog.Error("save session", "phone", phone, "err", err)
@@ -365,7 +377,11 @@ func (h *Handler) promptNagarsevak(ctx context.Context, phone string, sess *stor
         return
     }
     if len(nagarsevaks) == 0 {
-        _ = h.wa.SendText(ctx, phone, "⚠️ No nagarsevaks found for Ward "+sess.Ward+". Please choose a different ward.")
+    	wardDisplay := sess.Ward
+    	if (sess.Lang == "mr" || sess.Lang == "hi") && sess.WardHindi != "" {
+    		wardDisplay = sess.WardHindi
+    	}
+        _ = h.wa.SendText(ctx, phone, "⚠️ No corporators found for Ward "+wardDisplay+". Please choose a different ward.")
         sess.Step = store.StepWardChosen
         _ = h.store.Save(ctx, sess)
         h.promptWard(ctx, phone, sess)
@@ -388,7 +404,13 @@ func (h *Handler) promptNagarsevak(ctx context.Context, phone string, sess *stor
 		})
 	}
 
-	bodyText := fmt.Sprintf(t.WardPrompt, sess.Pincode, sess.Ward)
+	// Use Hindi ward name if available and language is Hindi/Marathi
+	displayWard := sess.Ward
+	if (sess.Lang == "mr" || sess.Lang == "hi") && sess.WardHindi != "" {
+		displayWard = sess.WardHindi
+	}
+
+	bodyText := fmt.Sprintf(t.WardPrompt, sess.Pincode, displayWard)
 
 	if err := h.wa.SendList(ctx, phone, bodyText, "🏅 Select Corporator", []whatsapp.ListSection{
 		{Title: "👥 Corporators", Rows: rows},
