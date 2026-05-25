@@ -81,17 +81,12 @@ func main() {
 
 	// ── TASK 3 – Inactivity monitor ───────────────────────────────────────────
 	// When a user is idle for 90 seconds, we:
-	//   1. Send them a localised "session timed out" message.
-	//   2. Delete their Redis session so the next "Hi" starts fresh.
-	//      (Session deletion is handled inside the monitor itself before calling
-	//       this callback, so the callback only needs to send the message.)
+	//   1. Delete their Redis session so the next "Hi" starts fresh.
+	//      (Session deletion is handled inside the monitor itself.)
+	//   2. Session timeout message is disabled.
 	inactiveMonitor := inactivity.New(rdb, func(cbCtx context.Context, phone, lang string) {
-		// Session has already been cleared by the monitor before this fires.
-		// lang is the user's last-known language — use it for a localised message.
-		msg := inactivity.InactivityMessage(lang)
-		if err := waClient.SendText(cbCtx, phone, msg); err != nil {
-			slog.Warn("inactivity: failed to send timeout message", "phone", phone, "err", err)
-		}
+		// Session has already been cleared by the monitor.
+		// Timeout message disabled — session will reset on next message.
 	})
 	inactiveMonitor.Start(ctx)
 

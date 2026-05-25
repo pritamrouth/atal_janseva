@@ -69,7 +69,7 @@ func (h *Handler) HandleRaw(msg whatsapp.Message) {
 	switch sess.Step {
 
 	case store.StepStart:
-		if msg.Type == "text" && msg.Interactive != nil {
+		if msg.Type == "interactive" && msg.Interactive != nil {
 			id := buttonID(msg.Interactive)
 			switch id {
 			case "lang_en":
@@ -88,7 +88,7 @@ func (h *Handler) HandleRaw(msg whatsapp.Message) {
 				return
 			}
 		} else {
-			_ = h.wa.SendText(ctx, phone, h.t(sess).PinPrompt)
+			h.sendLanguagePicker(ctx, phone, phone)
 		}
 
 	case store.StepLangChosen:
@@ -129,7 +129,8 @@ func (h *Handler) HandleRaw(msg whatsapp.Message) {
 // by the language-picker button message with the user's real phone number.
 func (h *Handler) sendLanguagePicker(ctx context.Context, phone, rawPhone string) {
 	greeting := GreetingFor("en", rawPhone)
-	if err := h.wa.SendButtonsWithImageHeader(ctx, phone, greeting, ataljansevaLogoURL, [][2]string{
+	logoPath := "file:///D:/Personal-Projects/atal_janseva/public/Ataljanseva_Without_WebPortal.png"
+	if err := h.wa.SendButtonsWithImageHeader(ctx, phone, greeting, logoPath, [][2]string{
 		{"lang_en", "🇮🇳 English"},
 		{"lang_mr", "🇮🇳 मराठी"},
 		{"lang_hi", "🇮🇳 हिंदी"},
