@@ -73,7 +73,7 @@ To continue further, please search for your respective Corporator.
 Please enter your *6-digit PIN Code* and *Ward Number* in the following format:
 
 📍 *PIN Code, Ward Number*
-Example: *400601, TES1*`,
+Example: *400601,21D*`,
 
 		InvalidPin: `⚠️ The entered PIN Code and Ward Number *%s* could not be found or do not match our records.
 

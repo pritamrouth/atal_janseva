@@ -76,8 +76,8 @@ func (r *Repo) Close() error { return r.db.Close() }
 func (r *Repo) LocationByPincode(ctx context.Context, pincode string) (*LocationInfo, error) {
 	row := r.db.QueryRowContext(ctx, `
 		SELECT state, district,
-		       COALESCE(state_hindi,''),
-		       COALESCE(district_hindi,'')
+		       state_hindi,
+		       district_hindi
 		FROM   political_users
 		WHERE  pincode::text = $1
 		  AND  is_active = true
@@ -85,15 +85,22 @@ func (r *Repo) LocationByPincode(ctx context.Context, pincode string) (*Location
 	`, pincode)
 
 	var loc LocationInfo
-	if err := row.Scan(&loc.State, &loc.District, &loc.StateHindi, &loc.DistrictHindi); err != nil {
+	var stateHindi, districtHindi sql.NullString
+	if err := row.Scan(&loc.State, &loc.District, &stateHindi, &districtHindi); err != nil {
 		return nil, err
+	}
+	if stateHindi.Valid {
+		loc.StateHindi = stateHindi.String
+	}
+	if districtHindi.Valid {
+		loc.DistrictHindi = districtHindi.String
 	}
 	return &loc, nil
 }
 
 func (r *Repo) WardsByPincode(ctx context.Context, pincode string) ([]Ward, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT DISTINCT ward, COALESCE(ward_hindi,'')
+		SELECT DISTINCT ward, ward_hindi
 		FROM   political_users
 		WHERE  pincode::text = $1
 		  AND  ward IS NOT NULL
@@ -109,8 +116,12 @@ func (r *Repo) WardsByPincode(ctx context.Context, pincode string) ([]Ward, erro
 	var wards []Ward
 	for rows.Next() {
 		var w Ward
-		if err := rows.Scan(&w.Code, &w.CodeHindi); err != nil {
+		var wardHindi sql.NullString
+		if err := rows.Scan(&w.Code, &wardHindi); err != nil {
 			return nil, err
+		}
+		if wardHindi.Valid {
+			w.CodeHindi = wardHindi.String
 		}
 		wards = append(wards, w)
 	}
@@ -123,11 +134,11 @@ func (r *Repo) NagarsevaksByWard(ctx context.Context, pincode, ward string) ([]N
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT id,
 		       full_name,
-		       COALESCE(name_hindi,''),
-		       COALESCE(party,''),
+		       name_hindi,
+		       party,
 		       ward,
 		       slug,
-		       COALESCE(profile_photo,'')
+		       profile_photo
 		FROM   political_users
 		WHERE  pincode::text = $1
 		  AND  ward = $2
@@ -142,12 +153,22 @@ func (r *Repo) NagarsevaksByWard(ctx context.Context, pincode, ward string) ([]N
 	var list []Nagarsevak
 	for rows.Next() {
 		var n Nagarsevak
+		var nameHindi, party, profilePhoto sql.NullString
 		if err := rows.Scan(
-			&n.ID, &n.FullName, &n.NameHindi,
-			&n.Party, &n.Ward, &n.Slug,
-			&n.ProfilePhoto, // TASK 2
+			&n.ID, &n.FullName, &nameHindi,
+			&party, &n.Ward, &n.Slug,
+			&profilePhoto,
 		); err != nil {
 			return nil, err
+		}
+		if nameHindi.Valid {
+			n.NameHindi = nameHindi.String
+		}
+		if party.Valid {
+			n.Party = party.String
+		}
+		if profilePhoto.Valid {
+			n.ProfilePhoto = profilePhoto.String
 		}
 		list = append(list, n)
 	}
@@ -160,23 +181,33 @@ func (r *Repo) NagarsevakByID(ctx context.Context, id string) (*Nagarsevak, erro
 	row := r.db.QueryRowContext(ctx, `
 		SELECT id,
 		       full_name,
-		       COALESCE(name_hindi,''),
-		       COALESCE(party,''),
+		       name_hindi,
+		       party,
 		       ward,
 		       slug,
-		       COALESCE(profile_photo,'')
+		       profile_photo
 		FROM   political_users
 		WHERE  id = $1
 		LIMIT  1
 	`, id)
 
 	var n Nagarsevak
+	var nameHindi, party, profilePhoto sql.NullString
 	if err := row.Scan(
-		&n.ID, &n.FullName, &n.NameHindi,
-		&n.Party, &n.Ward, &n.Slug,
-		&n.ProfilePhoto, // TASK 2
+		&n.ID, &n.FullName, &nameHindi,
+		&party, &n.Ward, &n.Slug,
+		&profilePhoto,
 	); err != nil {
 		return nil, err
+	}
+	if nameHindi.Valid {
+		n.NameHindi = nameHindi.String
+	}
+	if party.Valid {
+		n.Party = party.String
+	}
+	if profilePhoto.Valid {
+		n.ProfilePhoto = profilePhoto.String
 	}
 	return &n, nil
 }
@@ -185,8 +216,8 @@ func (r *Repo) NagarsevakByID(ctx context.Context, id string) (*Nagarsevak, erro
 func (r *Repo) LocationByPincodeHindi(ctx context.Context, pincode string) (*LocationInfo, error) {
 	row := r.db.QueryRowContext(ctx, `
 		SELECT state, district,
-		       COALESCE(state_hindi,''),
-		       COALESCE(district_hindi,'')
+		       state_hindi,
+		       district_hindi
 		FROM   political_users
 		WHERE  pincode_hindi::text = $1
 		  AND  is_active = true
@@ -194,15 +225,22 @@ func (r *Repo) LocationByPincodeHindi(ctx context.Context, pincode string) (*Loc
 	`, pincode)
 
 	var loc LocationInfo
-	if err := row.Scan(&loc.State, &loc.District, &loc.StateHindi, &loc.DistrictHindi); err != nil {
+	var stateHindi, districtHindi sql.NullString
+	if err := row.Scan(&loc.State, &loc.District, &stateHindi, &districtHindi); err != nil {
 		return nil, err
+	}
+	if stateHindi.Valid {
+		loc.StateHindi = stateHindi.String
+	}
+	if districtHindi.Valid {
+		loc.DistrictHindi = districtHindi.String
 	}
 	return &loc, nil
 }
 
 func (r *Repo) WardsByPincodeHindi(ctx context.Context, pincode string) ([]Ward, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT DISTINCT ward, COALESCE(ward_hindi,'')
+		SELECT DISTINCT ward, ward_hindi
 		FROM   political_users
 		WHERE  pincode_hindi::text = $1
 		  AND  ward IS NOT NULL
@@ -218,8 +256,12 @@ func (r *Repo) WardsByPincodeHindi(ctx context.Context, pincode string) ([]Ward,
 	var wards []Ward
 	for rows.Next() {
 		var w Ward
-		if err := rows.Scan(&w.Code, &w.CodeHindi); err != nil {
+		var wardHindi sql.NullString
+		if err := rows.Scan(&w.Code, &wardHindi); err != nil {
 			return nil, err
+		}
+		if wardHindi.Valid {
+			w.CodeHindi = wardHindi.String
 		}
 		wards = append(wards, w)
 	}
@@ -230,11 +272,11 @@ func (r *Repo) NagarsevaksByWardHindi(ctx context.Context, pincode, ward string)
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT id,
 		       full_name,
-		       COALESCE(name_hindi,''),
-		       COALESCE(party,''),
+		       name_hindi,
+		       party,
 		       ward,
 		       slug,
-		       COALESCE(profile_photo,'')
+		       profile_photo
 		FROM   political_users
 		WHERE  pincode_hindi::text = $1
 		  AND  ward = $2
@@ -249,12 +291,22 @@ func (r *Repo) NagarsevaksByWardHindi(ctx context.Context, pincode, ward string)
 	var list []Nagarsevak
 	for rows.Next() {
 		var n Nagarsevak
+		var nameHindi, party, profilePhoto sql.NullString
 		if err := rows.Scan(
-			&n.ID, &n.FullName, &n.NameHindi,
-			&n.Party, &n.Ward, &n.Slug,
-			&n.ProfilePhoto,
+			&n.ID, &n.FullName, &nameHindi,
+			&party, &n.Ward, &n.Slug,
+			&profilePhoto,
 		); err != nil {
 			return nil, err
+		}
+		if nameHindi.Valid {
+			n.NameHindi = nameHindi.String
+		}
+		if party.Valid {
+			n.Party = party.String
+		}
+		if profilePhoto.Valid {
+			n.ProfilePhoto = profilePhoto.String
 		}
 		list = append(list, n)
 	}
