@@ -25,7 +25,7 @@ const ataljansevaDomain = "https://ataljanseva.in"
 // ataljansevaLogoURL is the publicly hosted Ataljanseva logo.
 // For development: use ngrok URL like https://abc123.ngrok.io/public/Ataljanseva_Without_WebPortal.png
 // For production: use https://ataljanseva.in/public/Ataljanseva_Without_WebPortal.png
-const ataljansevaLogoURL = "https://ataljanseva.in/logo-1.png"
+const ataljansevaLogoURL = "https://res.cloudinary.com/dkgfw2zf0/image/upload/v1779739320/Ataljanseva_Without_WebPortal_wcxp20.png"
 
 // Handler processes inbound WhatsApp messages.
 type Handler struct {
@@ -374,10 +374,21 @@ func (h *Handler) promptNagarsevak(ctx context.Context, phone string, sess *stor
 
     t := h.t(sess)
 
-    // ✅ No photo loop here anymore — photo moves to sendMainMenu after selection
-
+    // Build list rows from nagarsevaks
     rows := make([][3]string, 0, len(nagarsevaks))
-	bodyText := fmt.Sprintf(t.WardPrompt, sess.Pincode, sess.Ward)  // ← updated
+	for _, ns := range nagarsevaks {
+		displayName := ns.FullName
+		if (sess.Lang == "mr" || sess.Lang == "hi") && ns.NameHindi != "" {
+			displayName = ns.NameHindi
+		}
+		rows = append(rows, [3]string{
+			"ns_" + ns.ID,        // ID (for callback)
+			displayName,           // Name
+			ns.Party,              // Party/Description
+		})
+	}
+
+	bodyText := fmt.Sprintf(t.WardPrompt, sess.Pincode, sess.Ward)
 
 	if err := h.wa.SendList(ctx, phone, bodyText, "🏅 Select Corporator", []whatsapp.ListSection{
 		{Title: "👥 Corporators", Rows: rows},
