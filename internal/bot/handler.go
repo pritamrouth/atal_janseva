@@ -130,11 +130,10 @@ func (h *Handler) HandleRaw(msg whatsapp.Message) {
 // by the language-picker button message with the user's real phone number.
 func (h *Handler) sendLanguagePicker(ctx context.Context, phone, rawPhone string) {
 	greeting := GreetingFor("en", rawPhone)
-	logoPath := "file:///D:/Personal-Projects/atal_janseva/public/Ataljanseva_Without_WebPortal.png"
-	if err := h.wa.SendButtonsWithImageHeader(ctx, phone, greeting, logoPath, [][2]string{
-		{"lang_en", "🇮🇳 English"},
-		{"lang_mr", "🇮🇳 मराठी"},
-		{"lang_hi", "🇮🇳 हिंदी"},
+	if err := h.wa.SendButtonsWithImageHeader(ctx, phone, greeting, ataljansevaLogoURL, [][2]string{
+		{"lang_en", "English"},
+		{"lang_mr", "मराठी"},
+		{"lang_hi", "हिंदी"},
 	}); err != nil {
 		slog.Error("sendLanguagePicker", "phone", phone, "err", err)
 	}
