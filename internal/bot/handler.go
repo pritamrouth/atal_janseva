@@ -482,15 +482,20 @@ func (h *Handler) sendMainMenu(ctx context.Context, phone string, sess *store.Se
 		_ = h.wa.SendText(ctx, phone, header+t.Welcome)
 	}
 
-	// CTA URL buttons
-	ctaButtons := []whatsapp.CTAButton{
-		{Title: t.LabelSOS,      URL: nagarsevakURL(sess.NagarsevakSlug, "sos")},
-		{Title: t.LabelRegister, URL: nagarsevakURL(sess.NagarsevakSlug, "grievance")},
-		{Title: t.LabelTrack,    URL: nagarsevakURL(sess.NagarsevakSlug, "track-issue")},
+	// CTA URL buttons - send each with its own language-based header
+	buttons := []struct {
+		header string
+		button whatsapp.CTAButton
+	}{
+		{t.SOSHeader, whatsapp.CTAButton{Title: t.LabelSOS, URL: nagarsevakURL(sess.NagarsevakSlug, "sos")}},
+		{t.ComplaintHeader, whatsapp.CTAButton{Title: t.LabelRegister, URL: nagarsevakURL(sess.NagarsevakSlug, "grievance")}},
+		{t.TrackHeader, whatsapp.CTAButton{Title: t.LabelTrack, URL: nagarsevakURL(sess.NagarsevakSlug, "track-issue")}},
 	}
-	bodyText := t.MainMenuHeader
-	if err := h.wa.SendCTAButtons(ctx, phone, bodyText, "", "", ctaButtons); err != nil {
-		slog.Error("sendMainMenu SendCTAButtons", "phone", phone, "err", err)
+
+	for _, b := range buttons {
+		if err := h.wa.SendCTAButtons(ctx, phone, b.header, "", "", []whatsapp.CTAButton{b.button}); err != nil {
+			slog.Error("sendMainMenu SendCTAButtons", "phone", phone, "err", err)
+		}
 	}
 }
 

@@ -11,6 +11,9 @@ type Strings struct {
 	NagarsevakPrompt string
 	Welcome          string
 	MainMenuHeader   string
+	SOSHeader        string
+	ComplaintHeader  string
+	TrackHeader      string
 
 	// Main-menu button labels
 	LabelSOS      string
@@ -106,6 +109,12 @@ How can we help you today? 👇`,
 * Raise Emergency SOS requests
 * Track complaint status`,
 
+		SOSHeader: `🚨 Raise Emergency SOS requests`,
+
+		ComplaintHeader: `📝 Register complaints`,
+
+		TrackHeader: `🔍 Track complaint status`,
+
 		LabelSOS:      "🆘 SOS Emergency Complaint",
 		LabelRegister: "📝 Register Complaint",
 		LabelTrack:    "🔍 Track Your Complaint",
@@ -151,6 +160,12 @@ How can we help you today? 👇`,
 * आपत्कालीन SOS मदत विनतंी करू शकता
 * आपल्या तक्रारीची स्थिती ट्रॅक करू शकता`,
 
+		SOSHeader: `🚨 आपत्कालीन SOS मदत विनतंी करा`,
+
+		ComplaintHeader: `📝 तक्रार नोंदव करा`,
+
+		TrackHeader: `🔍 तक्रारीची स्थिती ट्रॅक करा`,
+
 		LabelSOS:      "🆘 SOS आपत्कालीि तक्रार",
 		LabelRegister: "📝 तक्रार नोंदवा",
 		LabelTrack:    "🔍 आपली तक्रार टरॅक करा",
@@ -195,6 +210,12 @@ How can we help you today? 👇`,
 		MainMenuHeader: `* शिकायत दर्ज कर सकतेहैं
 * आपातकालीन SOS सहायता अनुरोध भेज सकतेहैं
 * अपनी शिकायत की स्थिति ट्रैक कर सकतेहैं`,
+
+		SOSHeader: `🚨 आपातकालीन SOS सहायता अनुरोध`,
+
+		ComplaintHeader: `📝 शिकायत दर्ज करें`,
+
+		TrackHeader: `🔍 शिकायत की स्थिति ट्रैक करें`,
 
 		LabelSOS:      "🆘 SOS आपातकालीि नशकायत",
 		LabelRegister: "📝 नशकायत दजवकर",
