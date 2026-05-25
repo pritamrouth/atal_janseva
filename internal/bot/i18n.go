@@ -103,9 +103,9 @@ through the Ataljanseva Citizen Portal.
 
 How can we help you today? 👇`,
 
-		LabelSOS:      "",
-		LabelRegister: "",
-		LabelTrack:    "",
+		LabelSOS:      "🚨 SOS",
+		LabelRegister: "📝 Register",
+		LabelTrack:    "📍 Track",
 		LabelEnglish:  "English",
 		LabelMarathi:  "मराठी",
 		LabelHindi:    "हिंदी",
@@ -146,9 +146,9 @@ How can we help you today? 👇`,
 
 कृपया खालील पर्या यांपकै ी एक नि वडा 👇`,
 
-		LabelSOS:      "",
-		LabelRegister: "",
-		LabelTrack:    "",
+		LabelSOS:      "🚨 एसओएस",
+		LabelRegister: "📝 तक्रार दाखल करा",
+		LabelTrack:    "📍 ट्रॅक करा",
 		LabelEnglish:  "English",
 		LabelMarathi:  "मराठी",
 		LabelHindi:    "हिंदी",
@@ -189,9 +189,9 @@ How can we help you today? 👇`,
 
 आज आप क्या करना चाहते हैं? 👇`,
 
-		LabelSOS:      "",
-		LabelRegister: "",
-		LabelTrack:    "",
+		LabelSOS:      "🚨 एसओएस",
+		LabelRegister: "📝 तकरार दर्ज करें",
+		LabelTrack:    "📍 ट्रैक करें",
 		LabelEnglish:  "English",
 		LabelMarathi:  "मराठी",
 		LabelHindi:    "हिंदी",

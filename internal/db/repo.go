@@ -76,8 +76,8 @@ func (r *Repo) Close() error { return r.db.Close() }
 func (r *Repo) LocationByPincode(ctx context.Context, pincode string) (*LocationInfo, error) {
 	row := r.db.QueryRowContext(ctx, `
 		SELECT state, district,
-		       COALESCE(state_hindi, ''),
-		       COALESCE(district_hindi, '')
+		       state_hindi,
+		       district_hindi
 		FROM   political_users
 		WHERE  pincode::text = $1
 		  AND  is_active = true
@@ -85,8 +85,15 @@ func (r *Repo) LocationByPincode(ctx context.Context, pincode string) (*Location
 	`, pincode)
 
 	var loc LocationInfo
-	if err := row.Scan(&loc.State, &loc.District, &loc.StateHindi, &loc.DistrictHindi); err != nil {
+	var stateHindi, districtHindi sql.NullString
+	if err := row.Scan(&loc.State, &loc.District, &stateHindi, &districtHindi); err != nil {
 		return nil, err
+	}
+	if stateHindi.Valid {
+		loc.StateHindi = stateHindi.String
+	}
+	if districtHindi.Valid {
+		loc.DistrictHindi = districtHindi.String
 	}
 	return &loc, nil
 }
@@ -205,8 +212,8 @@ func (r *Repo) NagarsevakByID(ctx context.Context, id string) (*Nagarsevak, erro
 func (r *Repo) LocationByPincodeHindi(ctx context.Context, pincode string) (*LocationInfo, error) {
 	row := r.db.QueryRowContext(ctx, `
 		SELECT state, district,
-		       COALESCE(state_hindi, ''),
-		       COALESCE(district_hindi, '')
+		       state_hindi,
+		       district_hindi
 		FROM   political_users
 		WHERE  pincode_hindi::text = $1
 		  AND  is_active = true
@@ -214,8 +221,15 @@ func (r *Repo) LocationByPincodeHindi(ctx context.Context, pincode string) (*Loc
 	`, pincode)
 
 	var loc LocationInfo
-	if err := row.Scan(&loc.State, &loc.District, &loc.StateHindi, &loc.DistrictHindi); err != nil {
+	var stateHindi, districtHindi sql.NullString
+	if err := row.Scan(&loc.State, &loc.District, &stateHindi, &districtHindi); err != nil {
 		return nil, err
+	}
+	if stateHindi.Valid {
+		loc.StateHindi = stateHindi.String
+	}
+	if districtHindi.Valid {
+		loc.DistrictHindi = districtHindi.String
 	}
 	return &loc, nil
 }
