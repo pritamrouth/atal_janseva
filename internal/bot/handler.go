@@ -466,7 +466,7 @@ func (h *Handler) sendMainMenu(ctx context.Context, phone string, sess *store.Se
 		{Title: t.LabelRegister, URL: nagarsevakURL(sess.NagarsevakSlug, "grievance")},
 		{Title: t.LabelTrack,    URL: nagarsevakURL(sess.NagarsevakSlug, "track-issue")},
 	}
-	bodyText := "Choose an option to proceed 👇"
+	bodyText := "\u200B"
 	if err := h.wa.SendCTAButtons(ctx, phone, bodyText, "", "", ctaButtons); err != nil {
 		slog.Error("sendMainMenu SendCTAButtons", "phone", phone, "err", err)
 	}
