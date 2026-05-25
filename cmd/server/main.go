@@ -107,6 +107,8 @@ func main() {
 	mux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
 		fmt.Fprintf(w, `{"status":"ok","queue_len":%d}`, pool.QueueLen())
 	})
+	// Serve static files from public directory
+	mux.Handle("/public/", http.StripPrefix("/public/", http.FileServer(http.Dir("public"))))
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,

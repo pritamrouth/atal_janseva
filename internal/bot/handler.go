@@ -23,8 +23,8 @@ const jobTimeout = 12 * time.Second
 const ataljansevaDomain = "https://ataljanseva.in"
 
 // ataljansevaLogoURL is the publicly hosted Ataljanseva logo.
-// Served from your own CDN / storage — replace if the URL changes.
-const ataljansevaLogoURL = "https://ataljanseva.in/logo-1.png"
+// Served from the backend public directory.
+const ataljansevaLogoURL = "https://bot.ataljanseva.in/public/Ataljanseva_Without_WebPortal.png"
 
 // Handler processes inbound WhatsApp messages.
 type Handler struct {
