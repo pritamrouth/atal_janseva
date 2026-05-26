@@ -165,8 +165,7 @@ func (h *Handler) handlePin(ctx context.Context, phone string, sess *store.Sessi
 
 	// Ward is now mandatory — must be provided with pincode in one message
 	if wardHint == "" {
-		msg := fmt.Sprintf("Please send *pincode and ward* together.\n\nExample: `%s,A`", asciiPin)
-		_ = h.wa.SendText(ctx, phone, msg)
+		_ = h.wa.SendText(ctx, phone, fmt.Sprintf(h.t(sess).InvalidPin, asciiPin))
 		return
 	}
 
@@ -230,7 +229,7 @@ func (h *Handler) handlePin(ctx context.Context, phone string, sess *store.Sessi
 
 	if locErr != nil {
 		slog.Error("LocationByPincode", "pin", pin, "lang", sess.Lang, "err", locErr)
-		_ = h.wa.SendText(ctx, phone, "⚠️ Database error, please try again shortly.")
+		_ = h.wa.SendText(ctx, phone, fmt.Sprintf(h.t(sess).InvalidPin, pin))
 		return
 	}
 
@@ -242,7 +241,7 @@ func (h *Handler) handlePin(ctx context.Context, phone string, sess *store.Sessi
 	// Handle wards errors
 	if wardsErr != nil || len(wards) == 0 {
 		slog.Error("WardsByPincode in handlePin", "pin", sess.Pincode, "err", wardsErr)
-		_ = h.wa.SendText(ctx, phone, "⚠️ Could not load ward data. Please try again.")
+		_ = h.wa.SendText(ctx, phone, fmt.Sprintf(h.t(sess).InvalidPin, sess.Pincode))
 		return
 	}
 
@@ -277,8 +276,7 @@ func (h *Handler) handlePin(ctx context.Context, phone string, sess *store.Sessi
 func (h *Handler) sendInvalidWardHint(ctx context.Context, phone string, sess *store.Session, hint string, wards []db.Ward) {
 	input := sess.Pincode + ", " + hint
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf(h.t(sess).InvalidPin, input) + "\n\n")
-	sb.WriteString("Available wards:\n")
+	sb.WriteString(fmt.Sprintf(h.t(sess).InvalidPin, input))
 	for _, w := range wards {
 		label := w.Code
 		if (sess.Lang == "mr" || sess.Lang == "hi") && w.CodeHindi != "" {
@@ -286,7 +284,6 @@ func (h *Handler) sendInvalidWardHint(ctx context.Context, phone string, sess *s
 		}
 		sb.WriteString(fmt.Sprintf("  • *%s, %s*\n", sess.Pincode, label))
 	}
-	sb.WriteString("\nPlease type again 👇")
 	_ = h.wa.SendText(ctx, phone, sb.String())
 }
 
@@ -304,11 +301,11 @@ func (h *Handler) promptWard(ctx context.Context, phone string, sess *store.Sess
 	}
 	if err != nil {
 		slog.Error("WardsByPincode", "pin", sess.Pincode, "err", err)
-		_ = h.wa.SendText(ctx, phone, "⚠️ Could not load ward data. Please try again.")
+		_ = h.wa.SendText(ctx, phone, fmt.Sprintf(h.t(sess).InvalidPin, sess.Pincode))
 		return
 	}
 	if len(wards) == 0 {
-		_ = h.wa.SendText(ctx, phone, "⚠️ No wards found for this PIN. Please re-enter your PIN.")
+		_ = h.wa.SendText(ctx, phone, fmt.Sprintf(h.t(sess).InvalidPin, sess.Pincode))
 		sess.Step = store.StepLangChosen
 		_ = h.store.Save(ctx, sess)
 		return
@@ -326,21 +323,8 @@ func (h *Handler) promptWard(ctx context.Context, phone string, sess *store.Sess
 		districtName = sess.DistrictHindi
 	}
 
-	rows := make([][3]string, 0, len(wards))
-	for _, w := range wards {
-		label := w.Code
-		if (sess.Lang == "mr" || sess.Lang == "hi") && w.CodeHindi != "" {
-			label = w.CodeHindi  // ← show ward_hindi label in list
-		}
-		rows = append(rows, [3]string{"ward_" + w.Code, label, ""})
-	}
-
 	bodyText := fmt.Sprintf(t.WardPrompt, stateName, districtName)
-	if err := h.wa.SendList(ctx, phone, bodyText, "📍 Select Ward", []whatsapp.ListSection{
-		{Title: "🏙 Available Wards", Rows: rows},
-	}); err != nil {
-		slog.Error("promptWard SendList", "phone", phone, "err", err)
-	}
+	_ = h.wa.SendText(ctx, phone, bodyText)
 }
 
 func (h *Handler) handleWardReply(ctx context.Context, phone string, sess *store.Session, ir *whatsapp.InteractiveReply) {
@@ -373,7 +357,7 @@ func (h *Handler) promptNagarsevak(ctx context.Context, phone string, sess *stor
 	
 	if err != nil {
         slog.Error("NagarsevaksByWard", "pin", sess.Pincode, "ward", sess.Ward, "err", err)
-        _ = h.wa.SendText(ctx, phone, "⚠️ Could not load nagarsevak data. Please try again.")
+        _ = h.wa.SendText(ctx, phone, fmt.Sprintf(h.t(sess).InvalidPin, sess.Pincode+","+sess.Ward))
         return
     }
     if len(nagarsevaks) == 0 {
@@ -381,7 +365,7 @@ func (h *Handler) promptNagarsevak(ctx context.Context, phone string, sess *stor
     	if (sess.Lang == "mr" || sess.Lang == "hi") && sess.WardHindi != "" {
     		wardDisplay = sess.WardHindi
     	}
-        _ = h.wa.SendText(ctx, phone, "⚠️ No corporators found for Ward "+wardDisplay+". Please choose a different ward.")
+        _ = h.wa.SendText(ctx, phone, fmt.Sprintf(h.t(sess).InvalidPin, sess.Pincode+","+wardDisplay))
         sess.Step = store.StepWardChosen
         _ = h.store.Save(ctx, sess)
         h.promptWard(ctx, phone, sess)
@@ -429,7 +413,7 @@ func (h *Handler) handleNagarsevakReply(ctx context.Context, phone string, sess 
 	ns, err := h.repo.NagarsevakByID(ctx, nsID)
 	if err != nil {
 		slog.Error("NagarsevakByID", "id", nsID, "err", err)
-		_ = h.wa.SendText(ctx, phone, "⚠️ Could not find the selected nagarsevak. Please try again.")
+		_ = h.wa.SendText(ctx, phone, fmt.Sprintf(h.t(sess).InvalidPin, sess.Pincode+","+sess.Ward))
 		h.promptNagarsevak(ctx, phone, sess)
 		return
 	}
@@ -582,17 +566,3 @@ func wardMatchesHint(wardCode, hint string) bool {
 	return strings.EqualFold(wardCode, hint)
 }
 
-func (h *Handler) sendWardRequired(ctx context.Context, phone string, sess *store.Session, wards []db.Ward) {
-	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf(h.t(sess).InvalidPin, sess.Pincode) + "\n\n")
-	sb.WriteString("Available wards:\n")
-	for _, w := range wards {
-		label := w.Code
-		if (sess.Lang == "mr" || sess.Lang == "hi") && w.CodeHindi != "" {
-			label = w.CodeHindi
-		}
-		sb.WriteString(fmt.Sprintf("  • *%s, %s*\n", sess.Pincode, label))
-	}
-	sb.WriteString("\nPlease type again 👇")
-	_ = h.wa.SendText(ctx, phone, sb.String())
-}

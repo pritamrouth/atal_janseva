@@ -8,9 +8,7 @@ type Strings struct {
 	PinPrompt        string
 	InvalidPin       string
 	WardPrompt       string
-	NagarsevakPrompt string
 	Welcome          string
-	MainMenuHeader   string
 	SOSHeader        string
 	ComplaintHeader  string
 	TrackHeader      string
@@ -31,23 +29,16 @@ type Strings struct {
 func GreetingFor(lang, phone string) string {
 	// Format: +91 XXXXX XXXXX  (WhatsApp sends digits only, no "+")
 	formatted := formatPhone(phone)
+	
+	return fmt.Sprintf(`👋 Hi *%s*
+Please select your preferred language from below 👇!!
 
-	switch lang {
-	case "mr":
-		return fmt.Sprintf(`👋 नमस्कार *%s*
-कृपया आपली पसंतीची भाषा निवडा:`, formatted)
-	case "hi":
-		return fmt.Sprintf(`👋 नमस्ते *%s*
-कृपया अपनी पसंदीदा भाषा चुनें:`, formatted)
-	default: // "en"
-		return fmt.Sprintf(`👋 Hi *%s*
-Please select your preferred language from below 👇!!!! 
+कृपया तुमची पसंतीची भाषा निवडा 👇!! 
 
-कृपया तुमची पसंतीची भाषा निवडा 👇!!!! 
+कृपया नीचे से अपनी पसंदीदा भाषा चुनें 👇!!`, formatted)
 
-कृपया नीचे से अपनी पसंदीदा भाषा चुनें 👇!!!!`, formatted)
-	}
 }
+
 
 // formatPhone converts "919812345678" → "+91 98123 45678"
 func formatPhone(raw string) string {
@@ -70,156 +61,142 @@ func formatPhone(raw string) string {
 // so the user's real number is injected at runtime.
 var I18n = map[string]Strings{
 	"en": {
-		PinPrompt: `This is the *Ataljanseva Citizen Service* Automatic Reply Chatbot for citizen support and assistance.
-To continue further, please search for your respective Corporator.
-Please enter your *6-digit PIN Code* and *Ward Number* in the following format:
+
+
+		PinPrompt: `This is the *Ataljanseva Citizen Service* Automatic Reply Chatbot.
+
+To continue further, please enter your *6-digit PIN Code* and *Ward Number* in the following format 👇!!.
 
 📍 *PIN Code, Ward Number*
 Example: *400601,21D*`,
 
-		InvalidPin: `⚠️ The entered PIN Code and Ward Number *%s* could not be found or do not match our records.
 
-Please re-enter the correct *6-digit PIN Code* and *Ward Number* to continue.
+
+		InvalidPin: `The entered PIN Code and Ward Number *%s* could not be found or do not match our records.
+
+Please re-enter the correct *6-digit PIN Code* and *Ward Number* in the following format to continue 👇
 
 📍 *PIN Code, Ward Number*
 Example: *400601,21D*`,
 
-		WardPrompt: `✅ You entered PIN Code and Ward Number *%s and %s* successfully.
-
-Please select your Corporator from the list below 👇`,
 
 
-		NagarsevakPrompt: `🏅 *Select Your Nagarsevak*
+		WardPrompt: `You entered *%s and %s* successfully.
 
-Here are the elected representatives for your ward.
-Tap a name to connect with your Nagarsevak 👇`,
+Please select your Corporator from the list below 👇!!`,
 
-		Welcome: `Thank you for staying connected with the Ataljanseva Citizen
-Service.
 
-You can:
-- View work reports, events & meetings, and active programs
-through the Ataljanseva Citizen Portal.
+
+		Welcome: `Thank you for staying connected with the Ataljanseva Citizen Service*!!
+
+You can view Work reports, Events & Meetings, Atal Local Employment and Active programs through the Ataljanseva Citizen Portal.
 
 🌐 For more information, please visit: _ataljanseva.in_
 
-How can we help you today? 👇`,
+Please select one of the services below 👇!!`,
 
-		MainMenuHeader: `* Register complaints
-* Raise Emergency SOS requests
-* Track complaint status`,
 
-		SOSHeader: `🚨 Raise Emergency SOS requests`,
+		SOSHeader: `Raise Emergency SOS requests`,
 
-		ComplaintHeader: `📝 Register complaints`,
+		ComplaintHeader: `Register complaints`,
 
-		TrackHeader: `🔍 Track complaint status`,
+		TrackHeader: `Track complaint status`,
 
-		LabelSOS:      "🆘 SOS Emergency Complaint",
-		LabelRegister: "📝 Register Complaint",
-		LabelTrack:    "🔍 Track Your Complaint",
+		LabelSOS:      "SOS Emergency Complaint",
+		LabelRegister: "Register Complaint",
+		LabelTrack:    "Track Your Complaint",
 		LabelEnglish:  "English",
 		LabelMarathi:  "मराठी",
 		LabelHindi:    "हिंदी",
 	},
 
 	"mr": {
-		PinPrompt: `ही नागरिक सहायता व सेवांसाठी *अटलजनसेवा नागरिक सेवेची* अधिकृत ऑटोमॅटिक रिप्लाय चॅटबॉट सेवा आहे.
-आपल्या संबंधित नगरसेवकाचा शोध घेण्यासाठी, कृपया ६ अंकी पिन कोड आणि आपला प्रभाग क्रमांक प्रविष्ट करा.
-📍 *पिन कोड, प्रभाग क्रमांक*
-उदाहरण: *४००६०१,२१डी*`,
+		PinPrompt: `हे अटलजनसेवा नागरिक सेवेची ऑटोमॅटिक रिप्लाय चॅटबॉट आहे.
 
-		InvalidPin: `⚠️ प्रविष्ट केलेला पिन कोड आणि प्रभाग क्रमांक *%s* आमच्या नोंदींशी जुळत नाही किंवा सापडला नाही.
-
-कृपया पुढे जाण्यासाठी योग्य *६ अंकी पिन कोड* आणि *प्रभाग क्रमांक* पुन्हा प्रविष्ट करा.
+पुढे जाण्यासाठी कृपया आपला ६ अंकी पिन कोड आणि प्रभाग क्रमांक खालील स्वरूपात प्रविष्ट करा 👇!!
 
 📍 *पिन कोड, प्रभाग क्रमांक*
 उदाहरण: *४००६०१,२१डी*`,
 
-		WardPrompt: `✅ आपण पिन कोड आणि प्रभाग क्रमांक *%s आणि %s* यशस्वीरित्या प्रविष्ट केले आहेत.
+		InvalidPin: `प्रविष्ट केलेला पिन कोड आणि प्रभाग क्रमांक *%s* आमच्या नोंदींशी जुळत नाही किंवा सापडला नाही.
+
+पुढे जाण्यासाठी कृपया आपला योग्य *६ अंकी पिन कोड* आणि *प्रभाग क्रमांक* खालील स्वरूपात पुन्हा प्रविष्ट करा 👇!!
+
+📍 *पिन कोड, प्रभाग क्रमांक*
+उदाहरण: *४००६०१,२१डी*`,
+
+		WardPrompt: `आपण *%s आणि %s* यशस्वीरित्या प्रविष्ट केले आहेत.
 
 कृपया खालील यादीतून आपल्या नगरसेवकाची निवड करा 👇`,
 
 
-		NagarsevakPrompt: `🏅 *आपला नगरसेवक निवडा*
+		Welcome: `*अटलजनसेवा नागरिक सेवेशी* जोडलेले राहिल्याबद्दल धन्यवाद !!
 
-आपल्या प्रभागातील निवडून आलेल्या प्रतिनिधींची यादी खाली आहे.
-आपल्या नगरसेवकाशी जोडण्यासाठी नाव निवडा 👇`,
+आपण येथे अटलजनसेवा नागरिक पोर्टलद्वारे कामाचा अहवाल, कार्यक्रम व बैठकांची माहिती, अटल स्थानिक रोजगार सेवा तसेच सक्रिय योजनांची माहिती पाहू शकता.
 
-		Welcome: `अटलजनसेवा नागरि क सेवेशी जोडलेलेराहि ल्याबद्दल धन्यवाद।
+🌐 अधिक माहितीसाठी कृपया भेट द्या: _ataljanseva.in_
 
-*आपण येथे:*
--  अटलजनसेवा नागरि क पोर्टलद्वारेकामाचा अहवाल, कार्यक्रर्य म व बठै कांची माहि ती
-तसेच सक्रि य योजनांची माहि ती पाहू शकता
+कृपया खालील पर्यायांपैकी एक निवडा 👇!!`,
 
-🌐 अधि क माहि तीसाठी कृ पया भेट द्या: _ataljanseva.in_
 
-कृपया खालील पर्या यांपकै ी एक नि वडा 👇`,
+		SOSHeader: `आपत्कालीन SOS मदत विनतंी करा`,
 
-		MainMenuHeader: `* तक्रार नोंदवू शकता
-* आपत्कालीन SOS मदत विनतंी करू शकता
-* आपल्या तक्रारीची स्थिती ट्रॅक करू शकता`,
+		ComplaintHeader: `तक्रार नोंदव करा`,
 
-		SOSHeader: `🚨 आपत्कालीन SOS मदत विनतंी करा`,
+		TrackHeader: `तक्रारीची स्थिती ट्रॅक करा`,
 
-		ComplaintHeader: `📝 तक्रार नोंदव करा`,
-
-		TrackHeader: `🔍 तक्रारीची स्थिती ट्रॅक करा`,
-
-		LabelSOS:      "🆘 SOS आपत्कालीि तक्रार",
-		LabelRegister: "📝 तक्रार नोंदवा",
-		LabelTrack:    "🔍 आपली तक्रार टरॅक करा",
+		LabelSOS:      "SOS आपत्कालीन तक्रार",
+		LabelRegister: "तक्रार नोंदवा",
+		LabelTrack:    "आपली तक्रार ट्रॅक करा",
 		LabelEnglish:  "English",
 		LabelMarathi:  "मराठी",
 		LabelHindi:    "हिंदी",
 	},
 
 	"hi": {
-		PinPrompt: `यह नागरिक सहायता और सेवाओं के लिए *अटलजनसेवा नागरिक सेवा* की अधिकृत ऑटोमेटिक रिप्लाय चैटबॉट सेवा है.
-अपने संबंधित नगरसेवक को खोजने के लिए, कृपया ६ अंकों का पिन कोड और अपना प्रभाग क्रमांक दर्ज करें.
-📍 *पिन कोड, प्रभाग क्रमांक*
+		PinPrompt: `*अटलजनसेवा नागरिक सेवा* ऑटोमेटिक रिप्लाई चैटबॉट है।
+
+आगे बढ़ने के लिए कृपया अपना ६ अंकों का पिन कोड और प्रभाग नंबर नीचे दिए गए प्रारूप में दर्ज करें 👇!!
+
+📍 *पिन कोड, प्रभाग नंबर*
 उदाहरण: *४००६०१,२१डी*`,
 
-		InvalidPin: `⚠️ आपके द्वारा दर्ज किया गया पिन कोड और प्रभाग क्रमांक *%s* गलत है या उपलब्ध नहीं है.
 
-कृपया आगे बढ़ने के लिए सही *६ अंकों का पिन कोड* और *प्रभाग क्रमांक* पुनः दर्ज करें.
+		InvalidPin: `आपके द्वारा दर्ज की गई पिन कोड और प्रभाग नंबर *%s* गलत है या उपलब्ध नहीं है।
 
-📍 *पिन कोड, प्रभाग क्रमांक*
+आगे बढ़ने के लिए कृपया अपना सही ६ अंकों का पिन कोड और प्रभाग नंबर नीचे दिए गए प्रारूप में पुनः दर्ज करें 👇
+
+📍 *पिन कोड, प्रभाग नंबर*
 उदाहरण: *४००६०१,२१डी*`,
 
-		WardPrompt: `✅ आपने पिन कोड और प्रभाग क्रमांक *%s और %s* सफलतापूर्वक दर्ज किया है.
 
-कृपया नीचे दी गई सूची में से अपने नगरसेवक का चयन करें 👇`,
 
-		NagarsevakPrompt: `🏅 *अपना नगरसेवक चुनें*
+		WardPrompt: `आपने पिन कोड और प्रभाग नंबर *%s और %s* सफलतापूर्वक दर्ज की है।
 
-आपके वार्ड के निर्वाचित प्रतिनिधियों की सूची नीचे दी गई है.
-अपने नगरसेवक से जुड़ने के लिए नाम चुनें 👇`,
+कृपया नीचे दी गई सूची में से अपने नगरसेवक का चयन करें 👇!!`,
 
-		Welcome: `अटलजनसेवा नागरि क सेवा सेजड़ु
-ेरहनेके लि ए धन्यवाद।
 
-*आप यहाँ:*
--अटलजनसेवा नागरि क पोर्टल के माध्यम सेकार्य रि पोर्ट, कार्यक्रर्य म एवं बठै कों तथा
-सक्रि य योजनाओं की जानकारी देख सकते है
+
+		Welcome: `अटलजनसेवा नागरिक सेवा से जुड़े रहने के लिए धन्यवाद !!
+
+आप यहाँ अटलजनसेवा नागरिक पोर्टल के माध्यम से कार्य रिपोर्ट, अटल स्थानीय रोजगार सेवा, कार्यक्रम एवं बैठकों तथा सक्रिय योजनाओं की जानकारी देख सकते हैं।
 
 🌐 अधिक जानकारी के लिए कृपया विजिट करें: _ataljanseva.in_
 
-आज आप क्या करना चाहते हैं? 👇`,
+कृपया नीचे दिए गए विकल्पों में से एक का चयन करें 👇!!`,
 
-		MainMenuHeader: `* शिकायत दर्ज कर सकतेहैं
-* आपातकालीन SOS सहायता अनुरोध भेज सकतेहैं
-* अपनी शिकायत की स्थिति ट्रैक कर सकतेहैं`,
 
-		SOSHeader: `🚨 आपातकालीन SOS सहायता अनुरोध`,
 
-		ComplaintHeader: `📝 शिकायत दर्ज करें`,
 
-		TrackHeader: `🔍 शिकायत की स्थिति ट्रैक करें`,
+		SOSHeader: `आपातकालीन SOS सहायता अनुरोध`,
 
-		LabelSOS:      "🆘 SOS आपातकालीि नशकायत",
-		LabelRegister: "📝 नशकायत दजवकर",
-		LabelTrack:    "🔍 अपिी नशकायत टरैक कर",
+		ComplaintHeader: `शिकायत दर्ज करें`,
+
+		TrackHeader: `शिकायत की स्थिति ट्रैक करें`,
+
+		LabelSOS:      "SOS आपातकालीन शिकायत",
+		LabelRegister: "शिकायत दर्ज करें",
+		LabelTrack:    "अपनी शिकायत ट्रैक करें",
 		LabelEnglish:  "English",
 		LabelMarathi:  "मराठी",
 		LabelHindi:    "हिंदी",
