@@ -409,20 +409,22 @@ func (h *Handler) sendMainMenu(ctx context.Context, phone string, sess *store.Se
 		}
 	}
 
+	// Inject nagarsevak slug into Welcome message
+	welcomeMsg := strings.ReplaceAll(t.Welcome, "{{slug}}", sess.NagarsevakSlug)
 
 	if ns.ProfilePhoto != "" {
 		// Single message: photo + full welcome text as caption
 		caption := fmt.Sprintf("🏅 *%s*\n🎖 %s  ·  🏙 Ward %s\n\n%s",
-			ns.FullName, ns.Party, ns.Ward, t.Welcome)
+			ns.FullName, ns.Party, ns.Ward, welcomeMsg)
 		if err := h.wa.SendImage(ctx, phone, ns.ProfilePhoto, caption); err != nil {
 			slog.Warn("sendMainMenu: profile photo send failed", "phone", phone, "err", err)
 			// fallback to plain text if image fails
-			_ = h.wa.SendText(ctx, phone, t.Welcome)
+			_ = h.wa.SendText(ctx, phone, welcomeMsg)
 		}
 	} else {
 		// No photo — send nagarsevak details + welcome as plain text
 		header := fmt.Sprintf("🏅 *%s*\n🎖 %s  ·  🏙 Ward %s\n\n", ns.FullName, ns.Party, ns.Ward)
-		_ = h.wa.SendText(ctx, phone, header+t.Welcome)
+		_ = h.wa.SendText(ctx, phone, header+welcomeMsg)
 	}
 
 	// CTA URL buttons - send each with its own language-based header

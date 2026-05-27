@@ -91,7 +91,7 @@ Please select your Corporator from the list below 👇!!`,
 
 You can view Work reports, Events & Meetings, Atal Local Employment and Active programs through the Ataljanseva Citizen Portal.
 
-🌐 For more information, please visit: _ataljanseva.in_
+🌐 For more information, please visit: _ataljanseva.in/{{slug}}_
 
 Please select one of the services below 👇!!`,
 
@@ -134,7 +134,7 @@ Please select one of the services below 👇!!`,
 
 आपण येथे अटलजनसेवा नागरिक पोर्टलद्वारे कामाचा अहवाल, कार्यक्रम व बैठकांची माहिती, अटल स्थानिक रोजगार सेवा तसेच सक्रिय योजनांची माहिती पाहू शकता.
 
-🌐 अधिक माहितीसाठी कृपया भेट द्या: _ataljanseva.in_
+🌐 अधिक माहितीसाठी कृपया भेट द्या: _ataljanseva.in/{{slug}}_
 
 कृपया खालील पर्यायांपैकी एक निवडा 👇!!`,
 
@@ -181,7 +181,7 @@ Please select one of the services below 👇!!`,
 
 आप यहाँ अटलजनसेवा नागरिक पोर्टल के माध्यम से कार्य रिपोर्ट, अटल स्थानीय रोजगार सेवा, कार्यक्रम एवं बैठकों तथा सक्रिय योजनाओं की जानकारी देख सकते हैं।
 
-🌐 अधिक जानकारी के लिए कृपया विजिट करें: _ataljanseva.in_
+🌐 अधिक जानकारी के लिए कृपया विजिट करें: _ataljanseva.in/{{slug}}_
 
 कृपया नीचे दिए गए विकल्पों में से एक का चयन करें 👇!!`,
 
