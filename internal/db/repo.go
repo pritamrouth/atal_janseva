@@ -79,7 +79,7 @@ func (r *Repo) LocationByPincode(ctx context.Context, pincode string) (*Location
 		       state_hindi,
 		       district_hindi
 		FROM   political_users
-		WHERE  pincode::text = $1
+		WHERE  (pincode::text = $1 OR pincode_hindi::text = $1)
 		  AND  is_active = true
 		LIMIT  1
 	`, pincode)
@@ -102,7 +102,7 @@ func (r *Repo) WardsByPincode(ctx context.Context, pincode string) ([]Ward, erro
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT DISTINCT ward, COALESCE(ward_hindi, '')
 		FROM   political_users
-		WHERE  pincode::text = $1
+		WHERE  (pincode::text = $1 OR pincode_hindi::text = $1)
 		  AND  ward IS NOT NULL
 		  AND  ward <> ''
 		  AND  is_active = true
@@ -126,6 +126,7 @@ func (r *Repo) WardsByPincode(ctx context.Context, pincode string) ([]Ward, erro
 
 // NagarsevaksByWard returns all active representatives for a pincode+ward.
 // It reads the profile_photo column (TASK 2).
+// Searches both ASCII and Devanagari columns for pincode and ward.
 func (r *Repo) NagarsevaksByWard(ctx context.Context, pincode, ward string) ([]Nagarsevak, error) {
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT id,
@@ -136,8 +137,8 @@ func (r *Repo) NagarsevaksByWard(ctx context.Context, pincode, ward string) ([]N
 		       slug,
 		       profile_photo
 		FROM   political_users
-		WHERE  pincode::text = $1
-		  AND  ward = $2
+		WHERE  (pincode::text = $1 OR pincode_hindi::text = $1)
+		  AND  (ward = $2 OR ward_hindi = $2)
 		  AND  is_active = true
 		ORDER  BY full_name
 	`, pincode, ward)
@@ -209,98 +210,17 @@ func (r *Repo) NagarsevakByID(ctx context.Context, id string) (*Nagarsevak, erro
 }
 
 
+// LocationByPincodeHindi is deprecated — use LocationByPincode which searches both columns
 func (r *Repo) LocationByPincodeHindi(ctx context.Context, pincode string) (*LocationInfo, error) {
-	row := r.db.QueryRowContext(ctx, `
-		SELECT state, district,
-		       state_hindi,
-		       district_hindi
-		FROM   political_users
-		WHERE  pincode_hindi::text = $1
-		  AND  is_active = true
-		LIMIT  1
-	`, pincode)
-
-	var loc LocationInfo
-	var stateHindi, districtHindi sql.NullString
-	if err := row.Scan(&loc.State, &loc.District, &stateHindi, &districtHindi); err != nil {
-		return nil, err
-	}
-	if stateHindi.Valid {
-		loc.StateHindi = stateHindi.String
-	}
-	if districtHindi.Valid {
-		loc.DistrictHindi = districtHindi.String
-	}
-	return &loc, nil
+	return r.LocationByPincode(ctx, pincode)
 }
 
+// WardsByPincodeHindi is deprecated — use WardsByPincode which searches both columns
 func (r *Repo) WardsByPincodeHindi(ctx context.Context, pincode string) ([]Ward, error) {
-	rows, err := r.db.QueryContext(ctx, `
-		SELECT DISTINCT ward, COALESCE(ward_hindi, '')
-		FROM   political_users
-		WHERE  pincode_hindi::text = $1
-		  AND  ward IS NOT NULL
-		  AND  ward <> ''
-		  AND  is_active = true
-		ORDER  BY ward
-	`, pincode)
-	if err != nil {
-		return nil, fmt.Errorf("WardsByPincodeHindi: %w", err)
-	}
-	defer rows.Close()
-
-	var wards []Ward
-	for rows.Next() {
-		var w Ward
-		if err := rows.Scan(&w.Code, &w.CodeHindi); err != nil {
-			return nil, err
-		}
-		wards = append(wards, w)
-	}
-	return wards, rows.Err()
+	return r.WardsByPincode(ctx, pincode)
 }
 
+// NagarsevaksByWardHindi is deprecated — use NagarsevaksByWard which searches both columns
 func (r *Repo) NagarsevaksByWardHindi(ctx context.Context, pincode, ward string) ([]Nagarsevak, error) {
-	rows, err := r.db.QueryContext(ctx, `
-		SELECT id,
-		       full_name,
-		       name_hindi,
-		       party,
-		       ward,
-		       slug,
-		       profile_photo
-		FROM   political_users
-		WHERE  pincode_hindi::text = $1
-		  AND  ward = $2
-		  AND  is_active = true
-		ORDER  BY full_name
-	`, pincode, ward)
-	if err != nil {
-		return nil, fmt.Errorf("NagarsevaksByWardHindi: %w", err)
-	}
-	defer rows.Close()
-
-	var list []Nagarsevak
-	for rows.Next() {
-		var n Nagarsevak
-		var nameHindi, party, profilePhoto sql.NullString
-		if err := rows.Scan(
-			&n.ID, &n.FullName, &nameHindi,
-			&party, &n.Ward, &n.Slug,
-			&profilePhoto,
-		); err != nil {
-			return nil, err
-		}
-		if nameHindi.Valid {
-			n.NameHindi = nameHindi.String
-		}
-		if party.Valid {
-			n.Party = party.String
-		}
-		if profilePhoto.Valid {
-			n.ProfilePhoto = profilePhoto.String
-		}
-		list = append(list, n)
-	}
-	return list, rows.Err()
+	return r.NagarsevaksByWard(ctx, pincode, ward)
 }

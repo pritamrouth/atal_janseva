@@ -180,32 +180,18 @@ func (h *Handler) handlePin(ctx context.Context, phone string, sess *store.Sessi
 	wardsChan := make(chan []db.Ward, 1)
 	wardsErrChan := make(chan error, 1)
 
-	isHindi := sess.Lang == "mr" || sess.Lang == "hi"
-
-	// Fetch location
+	// Fetch location (queries both ASCII and Devanagari columns)
 	go func() {
-		if isHindi {
-			l, err := h.repo.LocationByPincodeHindi(ctx, pin)
-			locChan <- l
-			locErrChan <- err
-		} else {
-			l, err := h.repo.LocationByPincode(ctx, asciiPin)
-			locChan <- l
-			locErrChan <- err
-		}
+		l, err := h.repo.LocationByPincode(ctx, asciiPin)
+		locChan <- l
+		locErrChan <- err
 	}()
 
-	// Fetch wards
+	// Fetch wards (queries both ASCII and Devanagari columns)
 	go func() {
-		if isHindi {
-			w, err := h.repo.WardsByPincodeHindi(ctx, pin)
-			wardsChan <- w
-			wardsErrChan <- err
-		} else {
-			w, err := h.repo.WardsByPincode(ctx, asciiPin)
-			wardsChan <- w
-			wardsErrChan <- err
-		}
+		w, err := h.repo.WardsByPincode(ctx, asciiPin)
+		wardsChan <- w
+		wardsErrChan <- err
 	}()
 
 	// Wait for both to complete
@@ -214,12 +200,8 @@ func (h *Handler) handlePin(ctx context.Context, phone string, sess *store.Sessi
 	wards = <-wardsChan
 	wardsErr = <-wardsErrChan
 
-	// Set pincode based on language
-	if isHindi {
-		sess.Pincode = pin
-	} else {
-		sess.Pincode = asciiPin
-	}
+	// Always store normalized ASCII pincode
+	sess.Pincode = asciiPin
 
 	// Handle location errors
 	if locErr == sql.ErrNoRows {
@@ -293,12 +275,8 @@ func (h *Handler) sendInvalidWardHint(ctx context.Context, phone string, sess *s
 
 func (h *Handler) promptWard(ctx context.Context, phone string, sess *store.Session) {
 	var wards []db.Ward
-	var err error
-	if sess.Lang == "mr" || sess.Lang == "hi" {
-		wards, err = h.repo.WardsByPincodeHindi(ctx, sess.Pincode)
-	} else {
-		wards, err = h.repo.WardsByPincode(ctx, sess.Pincode)
-	}
+	// Query searches both ASCII and Devanagari columns
+	wards, err := h.repo.WardsByPincode(ctx, sess.Pincode)
 	if err != nil {
 		slog.Error("WardsByPincode", "pin", sess.Pincode, "err", err)
 		_ = h.wa.SendText(ctx, phone, fmt.Sprintf(h.t(sess).InvalidPin, sess.Pincode))
@@ -348,12 +326,8 @@ func (h *Handler) handleWardReply(ctx context.Context, phone string, sess *store
 
 func (h *Handler) promptNagarsevak(ctx context.Context, phone string, sess *store.Session) {
 	var nagarsevaks []db.Nagarsevak
-	var err error
-	if sess.Lang == "mr" || sess.Lang == "hi" {
-		nagarsevaks, err = h.repo.NagarsevaksByWardHindi(ctx, sess.Pincode, sess.Ward)
-	} else {
-		nagarsevaks, err = h.repo.NagarsevaksByWard(ctx, sess.Pincode, sess.Ward)
-	}
+	// Query searches both ASCII and Devanagari columns
+	nagarsevaks, err := h.repo.NagarsevaksByWard(ctx, sess.Pincode, sess.Ward)
 	
 	if err != nil {
         slog.Error("NagarsevaksByWard", "pin", sess.Pincode, "ward", sess.Ward, "err", err)
