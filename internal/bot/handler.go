@@ -25,7 +25,7 @@ const ataljansevaDomain = "https://ataljanseva.in"
 // ataljansevaLogoURL is the publicly hosted Ataljanseva logo.
 // For development: use ngrok URL like https://abc123.ngrok.io/public/Ataljanseva_Without_WebPortal.png
 // For production: use https://ataljanseva.in/public/Ataljanseva_Without_WebPortal.png
-const ataljansevaLogoURL = "https://res.cloudinary.com/dkgfw2zf0/image/upload/v1779739320/Ataljanseva_Without_WebPortal_wcxp20.png"
+const ataljansevaLogoURL = "https://res.cloudinary.com/dkgfw2zf0/image/upload/v1779864154/AtalJanseva_512x512_rtjjqj.png"
 
 // Handler processes inbound WhatsApp messages.
 type Handler struct {
