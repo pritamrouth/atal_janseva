@@ -165,7 +165,7 @@ func (h *Handler) handlePin(ctx context.Context, phone string, sess *store.Sessi
 
 	// Ward is now mandatory — must be provided with pincode in one message
 	if wardHint == "" {
-		_ = h.wa.SendText(ctx, phone, fmt.Sprintf(h.t(sess).InvalidPin, asciiPin))
+		_ = h.wa.SendText(ctx, phone, h.t(sess).InvalidPin)
 		return
 	}
 
@@ -205,13 +205,13 @@ func (h *Handler) handlePin(ctx context.Context, phone string, sess *store.Sessi
 
 	// Handle location errors
 	if locErr == sql.ErrNoRows {
-		_ = h.wa.SendText(ctx, phone, fmt.Sprintf(h.t(sess).InvalidPin, pin))
+		_ = h.wa.SendText(ctx, phone, h.t(sess).InvalidPin)
 		return
 	}
 
 	if locErr != nil {
 		slog.Error("LocationByPincode", "pin", pin, "lang", sess.Lang, "err", locErr)
-		_ = h.wa.SendText(ctx, phone, fmt.Sprintf(h.t(sess).InvalidPin, pin))
+		_ = h.wa.SendText(ctx, phone, h.t(sess).InvalidPin)
 		return
 	}
 
@@ -223,7 +223,7 @@ func (h *Handler) handlePin(ctx context.Context, phone string, sess *store.Sessi
 	// Handle wards errors
 	if wardsErr != nil || len(wards) == 0 {
 		slog.Error("WardsByPincode in handlePin", "pin", sess.Pincode, "err", wardsErr)
-		_ = h.wa.SendText(ctx, phone, fmt.Sprintf(h.t(sess).InvalidPin, sess.Pincode))
+		_ = h.wa.SendText(ctx, phone, h.t(sess).InvalidPin)
 		return
 	}
 
@@ -253,20 +253,9 @@ func (h *Handler) handlePin(ctx context.Context, phone string, sess *store.Sessi
 	h.promptNagarsevak(ctx, phone, sess)
 }
 
-// sendInvalidWardHint tells the user their ward hint didn't match and shows
-// valid ward codes so they can retry with the correct format.
+// sendInvalidWardHint sends the basic InvalidPin error message without extras
 func (h *Handler) sendInvalidWardHint(ctx context.Context, phone string, sess *store.Session, hint string, wards []db.Ward) {
-	input := sess.Pincode + ", " + hint
-	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf(h.t(sess).InvalidPin, input))
-	for _, w := range wards {
-		label := w.Code
-		if (sess.Lang == "mr" || sess.Lang == "hi") && w.CodeHindi != "" {
-			label = w.CodeHindi
-		}
-		sb.WriteString(fmt.Sprintf("  • *%s, %s*\n", sess.Pincode, label))
-	}
-	_ = h.wa.SendText(ctx, phone, sb.String())
+	_ = h.wa.SendText(ctx, phone, h.t(sess).InvalidPin)
 }
 
 // ─────────────────────────────────────────────
@@ -279,11 +268,11 @@ func (h *Handler) promptWard(ctx context.Context, phone string, sess *store.Sess
 	wards, err := h.repo.WardsByPincode(ctx, sess.Pincode)
 	if err != nil {
 		slog.Error("WardsByPincode", "pin", sess.Pincode, "err", err)
-		_ = h.wa.SendText(ctx, phone, fmt.Sprintf(h.t(sess).InvalidPin, sess.Pincode))
+		_ = h.wa.SendText(ctx, phone, h.t(sess).InvalidPin)
 		return
 	}
 	if len(wards) == 0 {
-		_ = h.wa.SendText(ctx, phone, fmt.Sprintf(h.t(sess).InvalidPin, sess.Pincode))
+		_ = h.wa.SendText(ctx, phone, h.t(sess).InvalidPin)
 		sess.Step = store.StepLangChosen
 		_ = h.store.Save(ctx, sess)
 		return
@@ -331,15 +320,11 @@ func (h *Handler) promptNagarsevak(ctx context.Context, phone string, sess *stor
 	
 	if err != nil {
         slog.Error("NagarsevaksByWard", "pin", sess.Pincode, "ward", sess.Ward, "err", err)
-        _ = h.wa.SendText(ctx, phone, fmt.Sprintf(h.t(sess).InvalidPin, sess.Pincode+","+sess.Ward))
+        _ = h.wa.SendText(ctx, phone, h.t(sess).InvalidPin)
         return
     }
     if len(nagarsevaks) == 0 {
-    	wardDisplay := sess.Ward
-    	if (sess.Lang == "mr" || sess.Lang == "hi") && sess.WardHindi != "" {
-    		wardDisplay = sess.WardHindi
-    	}
-        _ = h.wa.SendText(ctx, phone, fmt.Sprintf(h.t(sess).InvalidPin, sess.Pincode+","+wardDisplay))
+        _ = h.wa.SendText(ctx, phone, h.t(sess).InvalidPin)
         sess.Step = store.StepWardChosen
         _ = h.store.Save(ctx, sess)
         h.promptWard(ctx, phone, sess)
@@ -387,7 +372,7 @@ func (h *Handler) handleNagarsevakReply(ctx context.Context, phone string, sess 
 	ns, err := h.repo.NagarsevakByID(ctx, nsID)
 	if err != nil {
 		slog.Error("NagarsevakByID", "id", nsID, "err", err)
-		_ = h.wa.SendText(ctx, phone, fmt.Sprintf(h.t(sess).InvalidPin, sess.Pincode+","+sess.Ward))
+		_ = h.wa.SendText(ctx, phone, h.t(sess).InvalidPin)
 		h.promptNagarsevak(ctx, phone, sess)
 		return
 	}

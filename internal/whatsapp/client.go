@@ -30,7 +30,7 @@ func New(phoneNumberID, accessToken string) *Client {
 	transport := &http.Transport{
 		MaxIdleConns:        200,
 		MaxIdleConnsPerHost: 100,
-		IdleConnTimeout:     90 * time.Second,
+		IdleConnTimeout:     60 * time.Second,
 		DialContext: (&net.Dialer{
 			Timeout:   5 * time.Second,
 			KeepAlive: 30 * time.Second,
