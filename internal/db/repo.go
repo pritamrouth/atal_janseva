@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"time"
 
 	_ "github.com/lib/pq"
@@ -74,6 +75,9 @@ func (r *Repo) Close() error { return r.db.Close() }
 // ─────────────────────────────────────────────
 
 func (r *Repo) LocationByPincode(ctx context.Context, pincode string) (*LocationInfo, error) {
+	start := time.Now()
+	slog.Debug("LocationByPincode", "pincode", pincode)
+
 	row := r.db.QueryRowContext(ctx, `
 		SELECT state, district,
 		       state_hindi,
@@ -87,6 +91,7 @@ func (r *Repo) LocationByPincode(ctx context.Context, pincode string) (*Location
 	var loc LocationInfo
 	var stateHindi, districtHindi sql.NullString
 	if err := row.Scan(&loc.State, &loc.District, &stateHindi, &districtHindi); err != nil {
+		slog.Error("LocationByPincode failed", "pincode", pincode, "duration_ms", time.Since(start).Milliseconds(), "err", err)
 		return nil, err
 	}
 	if stateHindi.Valid {
@@ -95,10 +100,14 @@ func (r *Repo) LocationByPincode(ctx context.Context, pincode string) (*Location
 	if districtHindi.Valid {
 		loc.DistrictHindi = districtHindi.String
 	}
+	slog.Debug("LocationByPincode success", "pincode", pincode, "state", loc.State, "district", loc.District, "duration_ms", time.Since(start).Milliseconds())
 	return &loc, nil
 }
 
 func (r *Repo) WardsByPincode(ctx context.Context, pincode string) ([]Ward, error) {
+	start := time.Now()
+	slog.Debug("WardsByPincode", "pincode", pincode)
+
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT DISTINCT ward, COALESCE(ward_hindi, '')
 		FROM   political_users
@@ -109,6 +118,7 @@ func (r *Repo) WardsByPincode(ctx context.Context, pincode string) ([]Ward, erro
 		ORDER  BY ward
 	`, pincode)
 	if err != nil {
+		slog.Error("WardsByPincode query failed", "pincode", pincode, "duration_ms", time.Since(start).Milliseconds(), "err", err)
 		return nil, fmt.Errorf("WardsByPincode: %w", err)
 	}
 	defer rows.Close()
@@ -117,17 +127,27 @@ func (r *Repo) WardsByPincode(ctx context.Context, pincode string) ([]Ward, erro
 	for rows.Next() {
 		var w Ward
 		if err := rows.Scan(&w.Code, &w.CodeHindi); err != nil {
+			slog.Error("WardsByPincode scan failed", "pincode", pincode, "duration_ms", time.Since(start).Milliseconds(), "err", err)
 			return nil, err
 		}
 		wards = append(wards, w)
 	}
-	return wards, rows.Err()
+	err = rows.Err()
+	if err != nil {
+		slog.Error("WardsByPincode rows error", "pincode", pincode, "duration_ms", time.Since(start).Milliseconds(), "err", err)
+		return nil, err
+	}
+	slog.Debug("WardsByPincode success", "pincode", pincode, "count", len(wards), "duration_ms", time.Since(start).Milliseconds())
+	return wards, nil
 }
 
 // NagarsevaksByWard returns all active representatives for a pincode+ward.
 // It reads the profile_photo column (TASK 2).
 // Searches both ASCII and Devanagari columns for pincode and ward.
 func (r *Repo) NagarsevaksByWard(ctx context.Context, pincode, ward string) ([]Nagarsevak, error) {
+	start := time.Now()
+	slog.Debug("NagarsevaksByWard", "pincode", pincode, "ward", ward)
+
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT id,
 		       full_name,
@@ -143,6 +163,7 @@ func (r *Repo) NagarsevaksByWard(ctx context.Context, pincode, ward string) ([]N
 		ORDER  BY full_name
 	`, pincode, ward)
 	if err != nil {
+		slog.Error("NagarsevaksByWard query failed", "pincode", pincode, "ward", ward, "duration_ms", time.Since(start).Milliseconds(), "err", err)
 		return nil, fmt.Errorf("NagarsevaksByWard: %w", err)
 	}
 	defer rows.Close()
@@ -156,6 +177,7 @@ func (r *Repo) NagarsevaksByWard(ctx context.Context, pincode, ward string) ([]N
 			&party, &n.Ward, &n.Slug,
 			&profilePhoto,
 		); err != nil {
+			slog.Error("NagarsevaksByWard scan failed", "pincode", pincode, "ward", ward, "duration_ms", time.Since(start).Milliseconds(), "err", err)
 			return nil, err
 		}
 		if nameHindi.Valid {
@@ -169,12 +191,21 @@ func (r *Repo) NagarsevaksByWard(ctx context.Context, pincode, ward string) ([]N
 		}
 		list = append(list, n)
 	}
-	return list, rows.Err()
+	err = rows.Err()
+	if err != nil {
+		slog.Error("NagarsevaksByWard rows error", "pincode", pincode, "ward", ward, "duration_ms", time.Since(start).Milliseconds(), "err", err)
+		return nil, err
+	}
+	slog.Debug("NagarsevaksByWard success", "pincode", pincode, "ward", ward, "count", len(list), "duration_ms", time.Since(start).Milliseconds())
+	return list, nil
 }
 
 // NagarsevakByID looks up a single representative by primary key.
 // It reads the profile_photo column (TASK 2).
 func (r *Repo) NagarsevakByID(ctx context.Context, id string) (*Nagarsevak, error) {
+	start := time.Now()
+	slog.Debug("NagarsevakByID", "id", id)
+
 	row := r.db.QueryRowContext(ctx, `
 		SELECT id,
 		       full_name,
@@ -195,6 +226,7 @@ func (r *Repo) NagarsevakByID(ctx context.Context, id string) (*Nagarsevak, erro
 		&party, &n.Ward, &n.Slug,
 		&profilePhoto,
 	); err != nil {
+		slog.Error("NagarsevakByID failed", "id", id, "duration_ms", time.Since(start).Milliseconds(), "err", err)
 		return nil, err
 	}
 	if nameHindi.Valid {
@@ -206,6 +238,7 @@ func (r *Repo) NagarsevakByID(ctx context.Context, id string) (*Nagarsevak, erro
 	if profilePhoto.Valid {
 		n.ProfilePhoto = profilePhoto.String
 	}
+	slog.Debug("NagarsevakByID success", "id", id, "name", n.FullName, "duration_ms", time.Since(start).Milliseconds())
 	return &n, nil
 }
 

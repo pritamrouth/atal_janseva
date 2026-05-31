@@ -159,13 +159,17 @@ func (h *Handler) handlePin(ctx context.Context, phone string, sess *store.Sessi
 	asciiPin := normalizePin(pin)
 
 	if len([]rune(asciiPin)) != 6 {
-		_ = h.wa.SendText(ctx, phone, h.t(sess).InvalidPin)
+		userInput := raw
+		msg := h.formatInvalidPinMessage(sess, userInput)
+		_ = h.wa.SendText(ctx, phone, msg)
 		return
 	}
 
 	// Ward is now mandatory — must be provided with pincode in one message
 	if wardHint == "" {
-		_ = h.wa.SendText(ctx, phone, h.t(sess).InvalidPin)
+		userInput := raw
+		msg := h.formatInvalidPinMessage(sess, userInput)
+		_ = h.wa.SendText(ctx, phone, msg)
 		return
 	}
 
@@ -205,13 +209,17 @@ func (h *Handler) handlePin(ctx context.Context, phone string, sess *store.Sessi
 
 	// Handle location errors
 	if locErr == sql.ErrNoRows {
-		_ = h.wa.SendText(ctx, phone, h.t(sess).InvalidPin)
+		userInput := asciiPin + "," + wardHint
+		msg := h.formatInvalidPinMessage(sess, userInput)
+		_ = h.wa.SendText(ctx, phone, msg)
 		return
 	}
 
 	if locErr != nil {
 		slog.Error("LocationByPincode", "pin", pin, "lang", sess.Lang, "err", locErr)
-		_ = h.wa.SendText(ctx, phone, h.t(sess).InvalidPin)
+		userInput := asciiPin + "," + wardHint
+		msg := h.formatInvalidPinMessage(sess, userInput)
+		_ = h.wa.SendText(ctx, phone, msg)
 		return
 	}
 
@@ -223,7 +231,9 @@ func (h *Handler) handlePin(ctx context.Context, phone string, sess *store.Sessi
 	// Handle wards errors
 	if wardsErr != nil || len(wards) == 0 {
 		slog.Error("WardsByPincode in handlePin", "pin", sess.Pincode, "err", wardsErr)
-		_ = h.wa.SendText(ctx, phone, h.t(sess).InvalidPin)
+		userInput := asciiPin + "," + wardHint
+		msg := h.formatInvalidPinMessage(sess, userInput)
+		_ = h.wa.SendText(ctx, phone, msg)
 		return
 	}
 
@@ -238,7 +248,7 @@ func (h *Handler) handlePin(ctx context.Context, phone string, sess *store.Sessi
 		}
 	}
 	if matched == "" {
-		h.sendInvalidWardHint(ctx, phone, sess, wardHint, wards)
+		h.sendInvalidWardHint(ctx, phone, sess, asciiPin, wardHint, wards)
 		return
 	}
 
@@ -253,9 +263,16 @@ func (h *Handler) handlePin(ctx context.Context, phone string, sess *store.Sessi
 	h.promptNagarsevak(ctx, phone, sess)
 }
 
-// sendInvalidWardHint sends the basic InvalidPin error message without extras
-func (h *Handler) sendInvalidWardHint(ctx context.Context, phone string, sess *store.Session, hint string, wards []db.Ward) {
-	_ = h.wa.SendText(ctx, phone, h.t(sess).InvalidPin)
+// formatInvalidPinMessage returns the InvalidPin error message formatted with user input
+func (h *Handler) formatInvalidPinMessage(sess *store.Session, pinAndWard string) string {
+	return fmt.Sprintf(h.t(sess).InvalidPin, pinAndWard)
+}
+
+// sendInvalidWardHint sends the InvalidPin error message with the user's input (PIN and ward hint)
+func (h *Handler) sendInvalidWardHint(ctx context.Context, phone string, sess *store.Session, pin string, wardHint string, wards []db.Ward) {
+	userInput := pin + "," + wardHint
+	msg := h.formatInvalidPinMessage(sess, userInput)
+	_ = h.wa.SendText(ctx, phone, msg)
 }
 
 // ─────────────────────────────────────────────
@@ -268,11 +285,13 @@ func (h *Handler) promptWard(ctx context.Context, phone string, sess *store.Sess
 	wards, err := h.repo.WardsByPincode(ctx, sess.Pincode)
 	if err != nil {
 		slog.Error("WardsByPincode", "pin", sess.Pincode, "err", err)
-		_ = h.wa.SendText(ctx, phone, h.t(sess).InvalidPin)
+		msg := h.formatInvalidPinMessage(sess, sess.Pincode)
+		_ = h.wa.SendText(ctx, phone, msg)
 		return
 	}
 	if len(wards) == 0 {
-		_ = h.wa.SendText(ctx, phone, h.t(sess).InvalidPin)
+		msg := h.formatInvalidPinMessage(sess, sess.Pincode)
+		_ = h.wa.SendText(ctx, phone, msg)
 		sess.Step = store.StepLangChosen
 		_ = h.store.Save(ctx, sess)
 		return
@@ -320,11 +339,15 @@ func (h *Handler) promptNagarsevak(ctx context.Context, phone string, sess *stor
 	
 	if err != nil {
         slog.Error("NagarsevaksByWard", "pin", sess.Pincode, "ward", sess.Ward, "err", err)
-        _ = h.wa.SendText(ctx, phone, h.t(sess).InvalidPin)
+        userInput := sess.Pincode + "," + sess.Ward
+        msg := h.formatInvalidPinMessage(sess, userInput)
+        _ = h.wa.SendText(ctx, phone, msg)
         return
     }
     if len(nagarsevaks) == 0 {
-        _ = h.wa.SendText(ctx, phone, h.t(sess).InvalidPin)
+        userInput := sess.Pincode + "," + sess.Ward
+        msg := h.formatInvalidPinMessage(sess, userInput)
+        _ = h.wa.SendText(ctx, phone, msg)
         sess.Step = store.StepWardChosen
         _ = h.store.Save(ctx, sess)
         h.promptWard(ctx, phone, sess)
@@ -372,7 +395,9 @@ func (h *Handler) handleNagarsevakReply(ctx context.Context, phone string, sess 
 	ns, err := h.repo.NagarsevakByID(ctx, nsID)
 	if err != nil {
 		slog.Error("NagarsevakByID", "id", nsID, "err", err)
-		_ = h.wa.SendText(ctx, phone, h.t(sess).InvalidPin)
+		userInput := sess.Pincode + "," + sess.Ward
+		msg := h.formatInvalidPinMessage(sess, userInput)
+		_ = h.wa.SendText(ctx, phone, msg)
 		h.promptNagarsevak(ctx, phone, sess)
 		return
 	}
